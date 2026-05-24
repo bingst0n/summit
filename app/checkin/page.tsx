@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { getGoals, getLogsForDate, getTodayTasks, upsertLog } from '@/lib/db'
+import { getGoals, getLogsForDate, getTodayTasks } from '@/lib/db'
 import { today } from '@/lib/utils'
 import type { Goal, DailyTask } from '@/lib/types'
 
@@ -36,9 +36,14 @@ export default function CheckinPage() {
   async function handleSubmit() {
     setSaving(true)
     try {
-      await Promise.all(
-        goals.map(g => upsertLog({ date, goal_id: g.id, notes: logs[g.id] ?? '' }))
-      )
+      await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date,
+          logs: goals.map(g => ({ goal_id: g.id, notes: logs[g.id] ?? '' })),
+        }),
+      })
       // Fire-and-forget schedule adjustment for continuous goals
       goals
         .filter(g => g.type === 'continuous')

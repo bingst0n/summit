@@ -148,9 +148,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Add goal */}
+      {/* Footer links */}
       {goals.length > 0 && (
-        <div className="flex justify-center pb-safe pt-2">
+        <div className="flex justify-between pb-safe pt-2">
+          <Link href="/history" className="text-zinc-500 text-sm font-medium">
+            History
+          </Link>
           <Link href="/chat" className="text-indigo-400 text-sm font-medium">
             + Add Goal
           </Link>

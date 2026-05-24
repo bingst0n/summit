@@ -16,7 +16,7 @@ export default function AppleIcon() {
       }}
     >
       <span style={{ fontSize: 110, fontWeight: 900, color: '#6366f1', fontFamily: 'sans-serif' }}>
-        L
+        S
       </span>
     </div>
   )

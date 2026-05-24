@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getGoals, deleteGoal } from '@/lib/db'
+import { getGoals } from '@/lib/db'
 import { daysUntil, formatDate } from '@/lib/utils'
 import type { Goal } from '@/lib/types'
 
@@ -19,7 +19,7 @@ export default function GoalsPage() {
 
   async function handleDelete(goalId: string) {
     if (!confirm('Delete this goal and all its data?')) return
-    await deleteGoal(goalId)
+    await fetch(`/api/goals/${goalId}`, { method: 'DELETE' })
     setGoals(prev => prev.filter(g => g.id !== goalId))
   }
 
