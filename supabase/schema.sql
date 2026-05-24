@@ -1,0 +1,34 @@
+-- Run this in your Supabase SQL editor
+
+create table if not exists goals (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  description text,
+  deadline date not null,
+  category text,
+  created_at timestamptz default now()
+);
+
+create table if not exists milestones (
+  id uuid primary key default gen_random_uuid(),
+  goal_id uuid references goals(id) on delete cascade,
+  title text not null,
+  target_date date not null,
+  completed boolean default false,
+  created_at timestamptz default now()
+);
+
+create table if not exists daily_logs (
+  id uuid primary key default gen_random_uuid(),
+  date date not null default current_date,
+  goal_id uuid references goals(id) on delete cascade,
+  notes text,
+  rating integer check (rating between 1 and 5),
+  created_at timestamptz default now(),
+  unique(date, goal_id)
+);
+
+-- Personal app — disable RLS so anon key can read/write freely
+alter table goals disable row level security;
+alter table milestones disable row level security;
+alter table daily_logs disable row level security;
