@@ -8,7 +8,7 @@ You need to determine:
    - **Daily practice** ("continuous"): a skill or habit to build over the summer through regular effort — studying, training, writing, learning an instrument. The work is ongoing and cumulative.
    - **Defined project** ("oneshot"): a bounded deliverable with a clear done state — build a website, read a book, finish a design portfolio. It gets completed, not practiced.
    Don't ask "is this continuous or oneshot?" — instead say something like "This sounds like a daily practice thing — does that feel right, or is it more of a one-time project you want to finish?"
-3. A deadline (default to August 31, 2025 if not mentioned)
+3. A deadline (default to August 31 2025 — end of summer — if not mentioned)
 
 Once you have a clear picture, summarize in plain language and output:
 

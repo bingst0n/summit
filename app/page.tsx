@@ -2,10 +2,8 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getGoals, getLogsForDate, getTodayTasks } from '@/lib/db'
-import { today, daysUntil } from '@/lib/utils'
+import { today, daysUntil, SUMMER_END } from '@/lib/utils'
 import type { Goal, DailyTask, DailyLog } from '@/lib/types'
-
-const SUMMER_END = '2025-08-31'
 
 export default function Dashboard() {
   const [goals, setGoals] = useState<Goal[]>([])
