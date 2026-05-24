@@ -22,7 +22,6 @@ export async function POST(req: Request) {
   const userPrompt = `Goal: ${goalData.title}
 Description: ${goalData.description ?? ''}
 Deadline: ${goalData.deadline}
-Daily time commitment: ${goalData.daily_minutes ?? 30} minutes
 Start date: ${today}`
 
   const message = await anthropic.messages.create({
