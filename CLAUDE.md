@@ -60,7 +60,7 @@ Daily check-in fires at 7 PM via a Vercel Cron job hitting `GET /api/cron/checki
 
 ## Environment Variables
 
-All 7 vars must be set in Vercel dashboard (Settings → Environment Variables) AND `.env.local`:
+All 8 vars must be set in Vercel dashboard (Settings → Environment Variables) AND `.env.local`:
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=        # base URL only, no /rest/v1/ suffix
@@ -70,6 +70,7 @@ PUSHCUT_API_KEY=
 PUSHCUT_NOTIFICATION_NAME=summit-checkin
 NEXT_PUBLIC_APP_URL=             # https://lockin-lake.vercel.app in prod
 CRON_SECRET=                     # random secret; Vercel passes it as Bearer token to cron route
+ANTHROPIC_API_KEY=               # Anthropic API key for Claude chat, schedule generation, adjustment
 ```
 
 ## Supabase Schema
