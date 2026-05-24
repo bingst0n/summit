@@ -1,13 +1,15 @@
 'use client'
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
 const INITIAL_MESSAGE: Message = {
   role: 'assistant',
-  content: "What do you want to accomplish this summer? Describe it in your own words.",
+  content: "What do you want to accomplish this summer? Tell me about it.",
 }
 
 function extractGoalData(text: string) {
@@ -31,17 +33,25 @@ export default function ChatPage() {
   const [streaming, setStreaming] = useState(false)
   const [saving, setSaving] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const lastAssistantContent = [...messages].reverse().find(m => m.role === 'assistant')?.content ?? ''
   const pendingGoalData = extractGoalData(lastAssistantContent)
 
+  const resizeTextarea = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 140) + 'px'
+  }, [])
+
   async function sendMessage() {
     if (!input.trim() || streaming) return
     const userMessage: Message = { role: 'user', content: input.trim() }
-    // Exclude hardcoded initial greeting; build proper alternating history for API
     const historyForApi = [...messages.slice(1), userMessage]
     setMessages(prev => [...prev, userMessage, { role: 'assistant', content: '' }])
     setInput('')
+    if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setStreaming(true)
 
     const res = await fetch('/api/chat', {
@@ -78,8 +88,8 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen px-4 pt-safe">
-      <div className="py-6 flex items-center justify-between">
+    <div className="flex flex-col min-h-[100dvh] px-4 pt-safe">
+      <div className="py-6 flex items-center justify-between shrink-0">
         <div>
           <h1 className="text-2xl font-bold">New Goal</h1>
           <p className="text-zinc-500 text-sm mt-0.5">Describe what you want to accomplish</p>
@@ -97,9 +107,17 @@ export default function ChatPage() {
                   : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
               }`}
             >
-              {m.role === 'assistant' ? stripGoalData(m.content) : m.content}
-              {m.role === 'assistant' && streaming && i === messages.length - 1 && (
-                <span className="inline-block w-1 h-4 bg-zinc-400 ml-1 animate-pulse align-middle" />
+              {m.role === 'assistant' ? (
+                <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {stripGoalData(m.content)}
+                  </ReactMarkdown>
+                  {streaming && i === messages.length - 1 && (
+                    <span className="inline-block w-1 h-4 bg-zinc-400 ml-0.5 animate-pulse align-middle" />
+                  )}
+                </div>
+              ) : (
+                m.content
               )}
             </div>
           </div>
@@ -120,10 +138,15 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="pb-safe pt-2 flex gap-2 border-t border-zinc-800">
-        <input
+      <div className="shrink-0 pt-2 pb-[env(safe-area-inset-bottom,16px)] flex gap-2 border-t border-zinc-800">
+        <textarea
+          ref={textareaRef}
           value={input}
-          onChange={e => setInput(e.target.value)}
+          rows={1}
+          onChange={e => {
+            setInput(e.target.value)
+            resizeTextarea()
+          }}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
@@ -132,12 +155,14 @@ export default function ChatPage() {
           }}
           placeholder="Type here..."
           disabled={streaming}
-          className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500 rounded-2xl px-4 py-3 text-sm outline-none disabled:opacity-40"
+          className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500 rounded-2xl px-4 py-3 text-base outline-none resize-none disabled:opacity-40 leading-normal"
+          style={{ minHeight: '48px', maxHeight: '140px' }}
         />
         <button
           onClick={sendMessage}
           disabled={streaming || !input.trim()}
-          className="bg-indigo-500 active:bg-indigo-600 text-white font-semibold px-5 py-3 rounded-2xl disabled:opacity-40 transition-colors"
+          className="bg-indigo-500 active:bg-indigo-600 text-white font-semibold px-5 rounded-2xl disabled:opacity-40 transition-colors self-end mb-0"
+          style={{ height: '48px' }}
         >
           Send
         </button>
