@@ -1,24 +1,27 @@
-export type Goal = {
+export type GoalType = 'continuous' | 'oneshot'
+
+export interface Goal {
   id: string
+  type: GoalType
   title: string
   description: string | null
-  deadline: string // YYYY-MM-DD
-  category: string | null
+  deadline: string
+  raw_input: string | null
   created_at: string
 }
 
-export type Milestone = {
+export interface DailyTask {
   id: string
   goal_id: string
-  title: string
-  target_date: string
-  completed: boolean
+  date: string
+  description: string
+  created_at: string
 }
 
-export type DailyLog = {
+export interface DailyLog {
   id: string
-  date: string // YYYY-MM-DD
+  date: string
   goal_id: string
-  notes: string | null
-  rating: number // 1-5
+  notes: string
+  created_at: string
 }
