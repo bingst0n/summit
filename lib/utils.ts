@@ -1,4 +1,4 @@
-export const SUMMER_END = '2025-08-31'
+export const SUMMER_END = '2026-08-31'
 
 export function today(): string {
   return new Date().toISOString().split('T')[0]
