@@ -1,7 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { getGoals, getLogsForDate, getTodayTasks } from '@/lib/db'
 import { today, daysUntil, SUMMER_END } from '@/lib/utils'
 import type { Goal, DailyTask, DailyLog } from '@/lib/types'
 
@@ -13,14 +12,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     const date = today()
-    Promise.all([getGoals(), getTodayTasks(date), getLogsForDate(date)]).then(
-      ([g, t, l]) => {
-        setGoals(g)
-        setTodayTasks(t)
-        setTodayLogs(l)
+    fetch(`/api/dashboard?date=${date}`)
+      .then(r => r.json())
+      .then(({ goals: g, todayTasks: t, todayLogs: l }) => {
+        setGoals(g ?? [])
+        setTodayTasks(t ?? [])
+        setTodayLogs(l ?? [])
         setLoading(false)
-      }
-    )
+      })
+      .catch(() => setLoading(false))
   }, [])
 
   const continuousGoals = goals.filter(g => g.type === 'continuous')
