@@ -92,11 +92,15 @@ export default function ChatPage() {
     if (!pendingGoalData) return
     setSaving(true)
     const rawInput = messages.find(m => m.role === 'user')?.content ?? ''
-    await fetch('/api/goals/generate-schedule', {
+    const res = await fetch('/api/goals/generate-schedule', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goalData: pendingGoalData, rawInput }),
     })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      console.error('Schedule generation failed:', body)
+    }
     setProgress(100)
     await new Promise(r => setTimeout(r, 400))
     router.refresh()

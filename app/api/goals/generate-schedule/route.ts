@@ -3,6 +3,16 @@ import { anthropic } from '@/lib/claude'
 import { SCHEDULE_GENERATION_SYSTEM } from '@/lib/prompts'
 import { createGoal, createDailyTasks } from '@/lib/db'
 
+function extractJsonArray(text: string): string {
+  const trimmed = text.trim()
+  if (trimmed.startsWith('[')) return trimmed
+  const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
+  if (fenceMatch) return fenceMatch[1].trim()
+  const arrayMatch = trimmed.match(/\[[\s\S]*\]/)
+  if (arrayMatch) return arrayMatch[0]
+  return trimmed
+}
+
 export async function POST(req: Request) {
   const { goalData, rawInput } = await req.json()
 
@@ -31,17 +41,25 @@ Start date: ${today}`
     messages: [{ role: 'user', content: userPrompt }],
   })
 
-  const text = message.content[0].type === 'text' ? message.content[0].text : '[]'
+  const rawText = message.content[0].type === 'text' ? message.content[0].text : '[]'
   let tasks: Array<{ date: string; description: string }> = []
   try {
-    tasks = JSON.parse(text)
+    tasks = JSON.parse(extractJsonArray(rawText))
   } catch {
-    console.error('Failed to parse schedule JSON:', text)
+    console.error('Failed to parse schedule JSON. Raw LLM output:', rawText)
+    return NextResponse.json({ goal, error: 'Failed to generate schedule', rawText }, { status: 500 })
   }
 
-  if (tasks.length > 0) {
-    await createDailyTasks(goal.id, tasks)
+  console.log(`Parsed ${tasks.length} tasks, first date: ${tasks[0]?.date}`)
+
+  try {
+    if (tasks.length > 0) {
+      await createDailyTasks(goal.id, tasks)
+    }
+  } catch (err) {
+    console.error('Failed to insert tasks into daily_tasks:', err)
+    return NextResponse.json({ goal, error: 'Failed to save tasks', details: String(err) }, { status: 500 })
   }
 
-  return NextResponse.json({ goal })
+  return NextResponse.json({ goal, taskCount: tasks.length })
 }

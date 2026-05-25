@@ -31,12 +31,12 @@ Use markdown naturally — **bold** for emphasis, bullets when listing options. 
 
 export const SCHEDULE_GENERATION_SYSTEM = `You generate daily task schedules for summer goals.
 
-Given a continuous goal, generate a specific task for each day from the start date through the deadline. Tasks should:
+Given a continuous goal, generate a specific task for each day from the start date through the deadline. The first entry MUST use the exact start date provided. Tasks should:
 - Be concrete and actionable (1–2 sentences)
 - Build progressively (foundational early, more advanced later)
 - Reflect the daily time commitment
 
-Output ONLY a valid JSON array, no markdown fences, no other text:
+Output ONLY a raw JSON array with no surrounding text, no markdown code fences, no explanation — just the array:
 [{"date":"YYYY-MM-DD","description":"..."},...]`
 
 export const ADJUSTMENT_SYSTEM = `You adjust goal schedules based on actual progress from a user's check-in logs.
