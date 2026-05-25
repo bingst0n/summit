@@ -1,5 +1,5 @@
 'use client'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -32,7 +32,20 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [progress, setProgress] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!saving) { setProgress(0); return }
+    setProgress(2)
+    const interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 88) return prev
+        return prev + (88 - prev) * 0.06
+      })
+    }, 400)
+    return () => clearInterval(interval)
+  }, [saving])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const lastAssistantContent = [...messages].reverse().find(m => m.role === 'assistant')?.content ?? ''
@@ -84,7 +97,36 @@ export default function ChatPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ goalData: pendingGoalData, rawInput }),
     })
+    setProgress(100)
+    await new Promise(r => setTimeout(r, 400))
+    router.refresh()
     router.push('/')
+  }
+
+  if (saving) {
+    const label = progress < 15
+      ? 'Saving goal...'
+      : progress < 50
+      ? 'Generating your schedule...'
+      : progress < 85
+      ? 'Building daily tasks...'
+      : 'Almost done...'
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[100dvh] px-8 gap-6">
+        <div className="w-full max-w-xs text-center">
+          <p className="text-zinc-300 font-semibold mb-1">{label}</p>
+          <p className="text-zinc-600 text-sm mb-6">This takes about 20 seconds</p>
+          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <p className="text-zinc-700 text-xs mt-3">{Math.round(progress)}%</p>
+        </div>
+      </div>
+    )
   }
 
   return (
