@@ -32,6 +32,7 @@ export default function ChatPage() {
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -91,16 +92,34 @@ export default function ChatPage() {
   async function saveGoal() {
     if (!pendingGoalData) return
     setSaving(true)
+    setSaveError(null)
     const rawInput = messages.find(m => m.role === 'user')?.content ?? ''
-    const res = await fetch('/api/goals/generate-schedule', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goalData: pendingGoalData, rawInput }),
-    })
+
+    let res: Response
+    try {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 55000)
+      res = await fetch('/api/goals/generate-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ goalData: pendingGoalData, rawInput }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+    } catch (err) {
+      setSaveError(`Request failed: ${err instanceof Error ? err.message : String(err)}`)
+      setSaving(false)
+      return
+    }
+
     if (!res.ok) {
       const body = await res.json().catch(() => ({}))
-      console.error('Schedule generation failed:', body)
+      const msg = body.error ?? body.details ?? `Server error ${res.status}`
+      setSaveError(msg)
+      setSaving(false)
+      return
     }
+
     setProgress(100)
     await new Promise(r => setTimeout(r, 400))
     router.refresh()
@@ -170,13 +189,16 @@ export default function ChatPage() {
         ))}
 
         {pendingGoalData && !streaming && (
-          <div className="flex justify-center pt-2">
+          <div className="flex flex-col items-center gap-2 pt-2">
+            {saveError && (
+              <p className="text-red-400 text-xs text-center max-w-xs">{saveError}</p>
+            )}
             <button
               onClick={saveGoal}
               disabled={saving}
               className="bg-green-600 active:bg-green-700 text-white font-semibold px-8 py-3 rounded-2xl disabled:opacity-40 transition-colors"
             >
-              {saving ? 'Saving & generating schedule...' : 'Save Goal ✓'}
+              {saving ? 'Saving & generating schedule...' : saveError ? 'Retry' : 'Save Goal ✓'}
             </button>
           </div>
         )}

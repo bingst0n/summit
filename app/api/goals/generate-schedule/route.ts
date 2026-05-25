@@ -3,6 +3,8 @@ import { anthropic } from '@/lib/claude'
 import { SCHEDULE_GENERATION_SYSTEM } from '@/lib/prompts'
 import { createGoal, createDailyTasks } from '@/lib/db'
 
+export const maxDuration = 60
+
 function extractJsonArray(text: string): string {
   const trimmed = text.trim()
   if (trimmed.startsWith('[')) return trimmed
@@ -16,27 +18,39 @@ function extractJsonArray(text: string): string {
 export async function POST(req: Request) {
   const { goalData, rawInput } = await req.json()
 
-  const goal = await createGoal({
-    type: goalData.type,
-    title: goalData.title,
-    description: goalData.description ?? null,
-    deadline: goalData.deadline,
-    raw_input: rawInput ?? null,
-  })
+  let goal
+  try {
+    goal = await createGoal({
+      type: goalData.type,
+      title: goalData.title,
+      description: goalData.description ?? null,
+      deadline: goalData.deadline,
+      raw_input: rawInput ?? null,
+    })
+  } catch (err) {
+    console.error('Failed to create goal:', err)
+    return NextResponse.json({ error: 'Failed to save goal', details: String(err) }, { status: 500 })
+  }
 
   if (goalData.type === 'oneshot') {
     return NextResponse.json({ goal })
   }
 
   const today = new Date().toISOString().split('T')[0]
+  // Generate the next 30 days (or until deadline if sooner) to stay within timeout
+  const horizon = new Date()
+  horizon.setDate(horizon.getDate() + 30)
+  const horizonStr = horizon.toISOString().split('T')[0]
+  const scheduleEnd = goalData.deadline < horizonStr ? goalData.deadline : horizonStr
+
   const userPrompt = `Goal: ${goalData.title}
 Description: ${goalData.description ?? ''}
-Deadline: ${goalData.deadline}
+Schedule through: ${scheduleEnd}
 Start date: ${today}`
 
   const message = await anthropic.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 8192,
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 4096,
     system: SCHEDULE_GENERATION_SYSTEM,
     messages: [{ role: 'user', content: userPrompt }],
   })
