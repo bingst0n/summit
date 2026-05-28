@@ -196,10 +196,18 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
             >
               {m.role === 'assistant' ? (
                 <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {stripTags(m.content)}
-                  </ReactMarkdown>
-                  {streaming && i === messages.length - 1 && (
+                  {streaming && i === messages.length - 1 && !m.content ? (
+                    <div className="flex gap-1 items-center py-1">
+                      <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {stripTags(m.content)}
+                    </ReactMarkdown>
+                  )}
+                  {streaming && i === messages.length - 1 && m.content && (
                     <span className="inline-block w-1 h-4 bg-zinc-400 ml-0.5 animate-pulse align-middle" />
                   )}
                 </div>
