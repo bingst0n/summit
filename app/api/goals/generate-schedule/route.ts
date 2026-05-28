@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/claude'
 import { SCHEDULE_GENERATION_SYSTEM } from '@/lib/prompts'
-import { createGoal, createDailyTasks } from '@/lib/db'
+import { createGoal, createDailyTasks, getGoals } from '@/lib/db'
 
 export const maxDuration = 60
+
+const GOAL_COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9']
 
 function extractJsonArray(text: string): string {
   const trimmed = text.trim()
@@ -18,6 +20,9 @@ function extractJsonArray(text: string): string {
 export async function POST(req: Request) {
   const { goalData, rawInput } = await req.json()
 
+  const existingGoals = await getGoals()
+  const color = GOAL_COLORS[existingGoals.length % GOAL_COLORS.length]
+
   let goal
   try {
     goal = await createGoal({
@@ -26,7 +31,7 @@ export async function POST(req: Request) {
       description: goalData.description ?? null,
       deadline: goalData.deadline,
       raw_input: rawInput ?? null,
-      color: goalData.color ?? '#3b82f6',
+      color,
     })
   } catch (err) {
     console.error('Failed to create goal:', err)
@@ -38,7 +43,6 @@ export async function POST(req: Request) {
   }
 
   const today = new Date().toISOString().split('T')[0]
-  // Generate the next 30 days (or until deadline if sooner) to stay within timeout
   const horizon = new Date()
   horizon.setDate(horizon.getDate() + 30)
   const horizonStr = horizon.toISOString().split('T')[0]
