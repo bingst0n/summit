@@ -1,61 +1,33 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import type { Goal, DailyTask, DailyLog } from '@/lib/types'
-import { today, daysUntil, SUMMER_END, formatDate } from '@/lib/utils'
+import Link from 'next/link'
+import type { DailyTask } from '@/lib/types'
+import { getGoals, getTodayTasks, getLogsForDate, getTasksInRange } from '@/lib/db'
+import { today, daysUntil, SUMMER_END } from '@/lib/utils'
 import TaskItem from '@/components/TaskItem'
 
-function getUpcomingDays(count: number): string[] {
-  return Array.from({ length: count }, (_, i) => {
+export default async function HomePage() {
+  const date = today()
+
+  const upcomingDays = Array.from({ length: 3 }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() + i + 1)
     return d.toISOString().split('T')[0]
   })
-}
 
-export default function HomePage() {
-  const router = useRouter()
-  const [goals, setGoals] = useState<Goal[]>([])
-  const [todayTasks, setTodayTasks] = useState<DailyTask[]>([])
-  const [todayLogs, setTodayLogs] = useState<DailyLog[]>([])
-  const [upcomingTasks, setUpcomingTasks] = useState<Record<string, DailyTask[]>>({})
-  const [loading, setLoading] = useState(true)
-
-  const date = today()
-  const upcomingDays = getUpcomingDays(3)
-
-  useEffect(() => {
-    const upcomingEnd = upcomingDays[upcomingDays.length - 1]
-    Promise.all([
-      fetch(`/api/dashboard?date=${date}`).then(r => r.json()),
-      fetch(`/api/tasks?start=${upcomingDays[0]}&end=${upcomingEnd}`).then(r => r.json()),
-    ])
-      .then(([dashboard, upcoming]) => {
-        setGoals(dashboard.goals ?? [])
-        setTodayTasks(dashboard.todayTasks ?? [])
-        setTodayLogs(dashboard.todayLogs ?? [])
-
-        const byDay: Record<string, DailyTask[]> = {}
-        for (const task of (upcoming.tasks ?? [])) {
-          if (!byDay[task.date]) byDay[task.date] = []
-          byDay[task.date].push(task)
-        }
-        setUpcomingTasks(byDay)
-        setLoading(false)
-      })
-      .catch(() => setLoading(false))
-  }, [])
+  const [goals, todayTasks, todayLogs, upcomingArr] = await Promise.all([
+    getGoals(),
+    getTodayTasks(date),
+    getLogsForDate(date),
+    getTasksInRange(upcomingDays[0], upcomingDays[upcomingDays.length - 1]),
+  ])
 
   const goalMap = Object.fromEntries(goals.map(g => [g.id, g]))
   const loggedToday = todayLogs.length > 0
   const daysLeft = daysUntil(SUMMER_END)
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-zinc-500 text-sm">Loading...</div>
-      </div>
-    )
+  const upcomingTasks: Record<string, DailyTask[]> = {}
+  for (const task of upcomingArr) {
+    if (!upcomingTasks[task.date]) upcomingTasks[task.date] = []
+    upcomingTasks[task.date].push(task)
   }
 
   return (
@@ -70,13 +42,9 @@ export default function HomePage() {
       </div>
 
       {/* Check-in banner */}
-      <div
-        className={`rounded-2xl p-4 mb-6 border ${
-          loggedToday
-            ? 'bg-green-950/40 border-green-900/50'
-            : 'bg-indigo-950/40 border-indigo-900/50'
-        }`}
-      >
+      <div className={`rounded-2xl p-4 mb-6 border ${
+        loggedToday ? 'bg-green-950/40 border-green-900/50' : 'bg-indigo-950/40 border-indigo-900/50'
+      }`}>
         {loggedToday ? (
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
@@ -95,12 +63,12 @@ export default function HomePage() {
               <p className="font-semibold text-indigo-300 text-sm">Tell the advisor how your day went</p>
               <p className="text-xs text-indigo-600 mt-0.5">Log your progress</p>
             </div>
-            <button
-              onClick={() => router.push('/advisor')}
+            <Link
+              href="/advisor"
               className="bg-indigo-500 active:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               Log Now
-            </button>
+            </Link>
           </div>
         )}
       </div>
@@ -128,16 +96,16 @@ export default function HomePage() {
               const count = upcomingTasks[d]?.length ?? 0
               if (count === 0) return null
               return (
-                <button
+                <Link
                   key={d}
-                  onClick={() => router.push(`/calendar?date=${d}`)}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-left active:bg-zinc-800"
+                  href={`/calendar?date=${d}`}
+                  className="flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 active:bg-zinc-800"
                 >
                   <span className="text-sm text-zinc-300">
                     {new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </span>
                   <span className="text-xs text-zinc-500">{count} task{count !== 1 ? 's' : ''}</span>
-                </button>
+                </Link>
               )
             })}
           </div>
@@ -148,12 +116,12 @@ export default function HomePage() {
       {goals.length === 0 && (
         <div className="bg-zinc-900 rounded-2xl p-8 text-center border border-zinc-800">
           <p className="text-zinc-400 text-sm mb-4">No goals yet. Talk to the advisor to add one.</p>
-          <button
-            onClick={() => router.push('/advisor')}
-            className="bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+          <Link
+            href="/advisor"
+            className="inline-block bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
           >
             Open Advisor
-          </button>
+          </Link>
         </div>
       )}
     </div>

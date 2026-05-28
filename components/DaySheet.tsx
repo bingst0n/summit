@@ -78,7 +78,7 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
             >
               <span
                 className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  lightState ? 'translate-x-6' : 'translate-x-0.5'
+                  lightState ? 'translate-x-[26px]' : 'translate-x-0.5'
                 }`}
               />
             </button>
