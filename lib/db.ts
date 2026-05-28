@@ -1,8 +1,6 @@
 import { supabase, supabaseServer } from './supabase'
-import type { Goal, DailyTask, DailyLog } from './types'
+import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState } from './types'
 
-// Server-side API routes need the service role client to bypass RLS.
-// Client-side useEffect calls use the anon client (fine for reads).
 function db() {
   if (typeof window === 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return supabaseServer()
@@ -40,6 +38,24 @@ export async function getTodayTasks(date: string): Promise<DailyTask[]> {
     .eq('date', date)
     .order('created_at')
   return data ?? []
+}
+
+export async function getTasksInRange(start: string, end: string): Promise<DailyTask[]> {
+  const { data } = await db()
+    .from('daily_tasks')
+    .select('*')
+    .gte('date', start)
+    .lte('date', end)
+    .order('date')
+  return data ?? []
+}
+
+export async function completeTask(id: string, completed: boolean) {
+  const { error } = await db()
+    .from('daily_tasks')
+    .update({ completed })
+    .eq('id', id)
+  if (error) throw error
 }
 
 export async function createDailyTasks(
@@ -117,6 +133,18 @@ export async function getAllLogs(): Promise<DailyLog[]> {
   return data ?? []
 }
 
+export async function getRecentLogs(days: number): Promise<DailyLog[]> {
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  const date = since.toISOString().split('T')[0]
+  const { data } = await db()
+    .from('daily_logs')
+    .select('*')
+    .gte('date', date)
+    .order('date', { ascending: false })
+  return data ?? []
+}
+
 export async function upsertLog(log: {
   date: string
   goal_id: string
@@ -125,5 +153,56 @@ export async function upsertLog(log: {
   const { error } = await db()
     .from('daily_logs')
     .upsert(log, { onConflict: 'date,goal_id' })
+  if (error) throw error
+}
+
+export async function getCalendarMarks(): Promise<CalendarMark[]> {
+  const { data } = await db()
+    .from('calendar_marks')
+    .select('*')
+    .order('date')
+  return data ?? []
+}
+
+export async function getLightDays(start: string, end: string): Promise<string[]> {
+  const { data } = await db()
+    .from('calendar_marks')
+    .select('date')
+    .gte('date', start)
+    .lte('date', end)
+  return (data ?? []).map((r: { date: string }) => r.date)
+}
+
+export async function toggleCalendarMark(date: string): Promise<boolean> {
+  const { data: existing } = await db()
+    .from('calendar_marks')
+    .select('date')
+    .eq('date', date)
+    .single()
+
+  if (existing) {
+    await db().from('calendar_marks').delete().eq('date', date)
+    return false
+  } else {
+    await db().from('calendar_marks').insert({ date, capacity: 'light' })
+    return true
+  }
+}
+
+export async function getConversationState(): Promise<ConversationState> {
+  const { data } = await db()
+    .from('conversation_state')
+    .select('*')
+    .eq('id', 1)
+    .single()
+  return data ?? { id: 1, summary: '', recent_messages: [], updated_at: new Date().toISOString() }
+}
+
+export async function upsertConversationState(
+  state: Pick<ConversationState, 'summary' | 'recent_messages'>
+) {
+  const { error } = await db()
+    .from('conversation_state')
+    .upsert({ id: 1, ...state, updated_at: new Date().toISOString() })
   if (error) throw error
 }

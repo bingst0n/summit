@@ -26,6 +26,7 @@ export async function POST(req: Request) {
       description: goalData.description ?? null,
       deadline: goalData.deadline,
       raw_input: rawInput ?? null,
+      color: goalData.color ?? '#3b82f6',
     })
   } catch (err) {
     console.error('Failed to create goal:', err)
