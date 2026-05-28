@@ -1,32 +1,53 @@
 'use client'
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { today, daysUntil, SUMMER_END } from '@/lib/utils'
+import { useRouter } from 'next/navigation'
 import type { Goal, DailyTask, DailyLog } from '@/lib/types'
+import { today, daysUntil, SUMMER_END, formatDate } from '@/lib/utils'
+import TaskItem from '@/components/TaskItem'
 
-export default function Dashboard() {
+function getUpcomingDays(count: number): string[] {
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date()
+    d.setDate(d.getDate() + i + 1)
+    return d.toISOString().split('T')[0]
+  })
+}
+
+export default function HomePage() {
+  const router = useRouter()
   const [goals, setGoals] = useState<Goal[]>([])
   const [todayTasks, setTodayTasks] = useState<DailyTask[]>([])
   const [todayLogs, setTodayLogs] = useState<DailyLog[]>([])
+  const [upcomingTasks, setUpcomingTasks] = useState<Record<string, DailyTask[]>>({})
   const [loading, setLoading] = useState(true)
 
+  const date = today()
+  const upcomingDays = getUpcomingDays(3)
+
   useEffect(() => {
-    const date = today()
-    fetch(`/api/dashboard?date=${date}`)
-      .then(r => r.json())
-      .then(({ goals: g, todayTasks: t, todayLogs: l }) => {
-        setGoals(g ?? [])
-        setTodayTasks(t ?? [])
-        setTodayLogs(l ?? [])
+    const upcomingEnd = upcomingDays[upcomingDays.length - 1]
+    Promise.all([
+      fetch(`/api/dashboard?date=${date}`).then(r => r.json()),
+      fetch(`/api/tasks?start=${upcomingDays[0]}&end=${upcomingEnd}`).then(r => r.json()),
+    ])
+      .then(([dashboard, upcoming]) => {
+        setGoals(dashboard.goals ?? [])
+        setTodayTasks(dashboard.todayTasks ?? [])
+        setTodayLogs(dashboard.todayLogs ?? [])
+
+        const byDay: Record<string, DailyTask[]> = {}
+        for (const task of (upcoming.tasks ?? [])) {
+          if (!byDay[task.date]) byDay[task.date] = []
+          byDay[task.date].push(task)
+        }
+        setUpcomingTasks(byDay)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
 
-  const continuousGoals = goals.filter(g => g.type === 'continuous')
-  const oneshotGoals = goals.filter(g => g.type === 'oneshot')
-  const loggedIds = new Set(todayLogs.map(l => l.goal_id))
-  const allLogged = continuousGoals.length > 0 && continuousGoals.every(g => loggedIds.has(g.id))
+  const goalMap = Object.fromEntries(goals.map(g => [g.id, g]))
+  const loggedToday = todayLogs.length > 0
   const daysLeft = daysUntil(SUMMER_END)
 
   if (loading) {
@@ -49,42 +70,40 @@ export default function Dashboard() {
       </div>
 
       {/* Check-in banner */}
-      {continuousGoals.length > 0 && (
-        <div
-          className={`rounded-2xl p-4 mb-6 border ${
-            allLogged
-              ? 'bg-green-950/40 border-green-900/50'
-              : 'bg-indigo-950/40 border-indigo-900/50'
-          }`}
-        >
-          {allLogged ? (
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5">
-                  <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div>
-                <p className="font-semibold text-green-300 text-sm">Logged for today</p>
-                <p className="text-xs text-green-600 mt-0.5">Schedule adjusting in the background</p>
-              </div>
+      <div
+        className={`rounded-2xl p-4 mb-6 border ${
+          loggedToday
+            ? 'bg-green-950/40 border-green-900/50'
+            : 'bg-indigo-950/40 border-indigo-900/50'
+        }`}
+      >
+        {loggedToday ? (
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-green-500/20 border border-green-500/40 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5">
+                <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
             </div>
-          ) : (
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold text-indigo-300 text-sm">Check in for today</p>
-                <p className="text-xs text-indigo-600 mt-0.5">Log your progress</p>
-              </div>
-              <Link
-                href="/checkin"
-                className="bg-indigo-500 active:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
-              >
-                Log Now
-              </Link>
+            <div>
+              <p className="font-semibold text-green-300 text-sm">Logged for today</p>
+              <p className="text-xs text-green-600 mt-0.5">Schedule adjusting in the background</p>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-indigo-300 text-sm">Tell the advisor how your day went</p>
+              <p className="text-xs text-indigo-600 mt-0.5">Log your progress</p>
+            </div>
+            <button
+              onClick={() => router.push('/advisor')}
+              className="bg-indigo-500 active:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              Log Now
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Today's tasks */}
       {todayTasks.length > 0 && (
@@ -92,45 +111,35 @@ export default function Dashboard() {
           <h2 className="text-base font-semibold text-zinc-300 mb-3">Today</h2>
           <div className="space-y-2">
             {todayTasks.map(task => {
-              const goal = goals.find(g => g.id === task.goal_id)
-              const logged = loggedIds.has(task.goal_id)
-              return (
-                <div
-                  key={task.id}
-                  className={`bg-zinc-900 rounded-2xl p-4 border ${
-                    logged ? 'border-green-900/40' : 'border-zinc-800'
-                  }`}
-                >
-                  <p className={`text-sm leading-relaxed ${logged ? 'text-zinc-500 line-through' : 'text-zinc-100'}`}>
-                    {task.description}
-                  </p>
-                  {goal && (
-                    <p className="text-xs text-zinc-600 mt-1.5">{goal.title}</p>
-                  )}
-                </div>
-              )
+              const goal = goalMap[task.goal_id]
+              if (!goal) return null
+              return <TaskItem key={task.id} task={task} goal={goal} />
             })}
           </div>
         </div>
       )}
 
-      {/* One-shot projects queue */}
-      {oneshotGoals.length > 0 && (
+      {/* Coming up */}
+      {upcomingDays.some(d => (upcomingTasks[d]?.length ?? 0) > 0) && (
         <div className="mb-6">
-          <h2 className="text-base font-semibold text-zinc-300 mb-3">Projects</h2>
-          <div className="space-y-2">
-            {oneshotGoals.map(goal => (
-              <div key={goal.id} className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800">
-                <p className="font-semibold text-sm">{goal.title}</p>
-                {goal.description && (
-                  <p className="text-xs text-zinc-500 mt-1 leading-relaxed">{goal.description}</p>
-                )}
-                <p className="text-xs text-zinc-600 mt-1.5">
-                  Due {new Date(goal.deadline + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  {' · '}{daysUntil(goal.deadline)}d left
-                </p>
-              </div>
-            ))}
+          <h2 className="text-base font-semibold text-zinc-300 mb-2">Coming up</h2>
+          <div className="space-y-1">
+            {upcomingDays.map(d => {
+              const count = upcomingTasks[d]?.length ?? 0
+              if (count === 0) return null
+              return (
+                <button
+                  key={d}
+                  onClick={() => router.push(`/calendar?date=${d}`)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 text-left active:bg-zinc-800"
+                >
+                  <span className="text-sm text-zinc-300">
+                    {new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </span>
+                  <span className="text-xs text-zinc-500">{count} task{count !== 1 ? 's' : ''}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
       )}
@@ -138,25 +147,13 @@ export default function Dashboard() {
       {/* Empty state */}
       {goals.length === 0 && (
         <div className="bg-zinc-900 rounded-2xl p-8 text-center border border-zinc-800">
-          <p className="text-zinc-400 text-sm mb-4">No goals yet. Add one to get started.</p>
-          <Link
-            href="/chat"
+          <p className="text-zinc-400 text-sm mb-4">No goals yet. Talk to the advisor to add one.</p>
+          <button
+            onClick={() => router.push('/advisor')}
             className="bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
           >
-            Add First Goal
-          </Link>
-        </div>
-      )}
-
-      {/* Footer links */}
-      {goals.length > 0 && (
-        <div className="flex justify-between pb-safe pt-2">
-          <Link href="/history" className="text-zinc-500 text-sm font-medium">
-            History
-          </Link>
-          <Link href="/chat" className="text-indigo-400 text-sm font-medium">
-            + Add Goal
-          </Link>
+            Open Advisor
+          </button>
         </div>
       )}
     </div>
