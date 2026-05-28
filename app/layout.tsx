@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Geist } from 'next/font/google'
 import './globals.css'
-import Nav from '@/components/Nav'
+import TabBar from '@/components/TabBar'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main className="max-w-lg mx-auto pb-24 min-h-screen">
           {children}
         </main>
-        <Nav />
+        <TabBar />
       </body>
     </html>
   )
