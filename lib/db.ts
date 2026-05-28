@@ -181,10 +181,12 @@ export async function toggleCalendarMark(date: string): Promise<boolean> {
     .single()
 
   if (existing) {
-    await db().from('calendar_marks').delete().eq('date', date)
+    const { error } = await db().from('calendar_marks').delete().eq('date', date)
+    if (error) throw error
     return false
   } else {
-    await db().from('calendar_marks').insert({ date, capacity: 'light' })
+    const { error } = await db().from('calendar_marks').insert({ date, capacity: 'light' })
+    if (error) throw error
     return true
   }
 }
