@@ -3,27 +3,16 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import {
+  extractGoalData,
+  extractDeleteGoal,
+  extractCheckIn,
+  stripTags,
+  type CheckInEntry,
+} from '@/lib/advisorParse'
+import { today } from '@/lib/utils'
 
 type Message = { role: 'user' | 'assistant'; content: string }
-
-function extractGoalData(text: string) {
-  const match = text.match(/<goal_data>([\s\S]*?)<\/goal_data>/)
-  if (!match) return null
-  try { return JSON.parse(match[1].trim()) } catch { return null }
-}
-
-function extractDeleteGoal(text: string) {
-  const match = text.match(/<delete_goal>([\s\S]*?)<\/delete_goal>/)
-  if (!match) return null
-  try { return JSON.parse(match[1].trim()) } catch { return null }
-}
-
-function stripTags(text: string) {
-  return text
-    .replace(/<goal_data>[\s\S]*?<\/goal_data>/g, '')
-    .replace(/<delete_goal>[\s\S]*?<\/delete_goal>/g, '')
-    .trim()
-}
 
 interface AdvisorChatProps {
   briefText: string
@@ -37,7 +26,8 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
-  const [scheduleStatus, setScheduleStatus] = useState<'idle' | 'updating' | 'updated'>('idle')
+  const [scheduleStatus, setScheduleStatus] = useState<'idle' | 'updating' | 'updated' | 'error'>('idle')
+  const lastCheckInRef = useRef<CheckInEntry[] | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -61,12 +51,15 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
   }, [messages])
 
   useEffect(() => {
-    if (!saving) { setProgress(0); return }
-    setProgress(2)
+    if (!saving) {
+      const t = setTimeout(() => setProgress(0), 0)
+      return () => clearTimeout(t)
+    }
+    const start = setTimeout(() => setProgress(2), 0)
     const interval = setInterval(() => {
       setProgress(prev => prev >= 88 ? prev : prev + (88 - prev) * 0.06)
     }, 400)
-    return () => clearInterval(interval)
+    return () => { clearTimeout(start); clearInterval(interval) }
   }, [saving])
 
   const resizeTextarea = useCallback(() => {
@@ -79,6 +72,38 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
   const lastAssistantContent = [...messages].reverse().find(m => m.role === 'assistant')?.content ?? ''
   const pendingGoalData = extractGoalData(lastAssistantContent)
   const pendingDeleteGoal = extractDeleteGoal(lastAssistantContent)
+
+  async function runCheckIn(checkIn: CheckInEntry[]) {
+    lastCheckInRef.current = checkIn
+    setScheduleStatus('updating')
+    try {
+      const res = await fetch('/api/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: today(), logs: checkIn }),
+      })
+      if (!res.ok) throw new Error(`checkin ${res.status}`)
+
+      const goalIds = [...new Set(checkIn.map(c => c.goal_id))]
+      await Promise.all(
+        goalIds.map(id =>
+          fetch('/api/adjust', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ goal_id: id }),
+          }).then(r => {
+            if (!r.ok) throw new Error(`adjust ${r.status}`)
+          })
+        )
+      )
+
+      setScheduleStatus('updated')
+      router.refresh()
+      setTimeout(() => setScheduleStatus('idle'), 3000)
+    } catch {
+      setScheduleStatus('error')
+    }
+  }
 
   async function sendMessage() {
     if (!input.trim() || streaming) return
@@ -107,10 +132,8 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
 
     setStreaming(false)
 
-    // If advisor mentioned adjusting the schedule, trigger it
-    if (text.includes('Updating schedule') || text.includes('adjust')) {
-      // Schedule adjustment is triggered server-side; just reflect status
-    }
+    const checkIn = extractCheckIn(text)
+    if (checkIn) runCheckIn(checkIn)
   }
 
   async function saveGoal() {
@@ -238,13 +261,39 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
               onClick={deleteGoal}
               className="bg-red-600 active:bg-red-700 text-white font-semibold px-8 py-3 rounded-2xl"
             >
-              Delete "{pendingDeleteGoal.title}"
+              Delete &quot;{pendingDeleteGoal.title}&quot;
             </button>
           </div>
         )}
 
         <div ref={bottomRef} />
       </div>
+
+      {scheduleStatus !== 'idle' && (
+        <div className="shrink-0 px-1 pb-2 text-xs">
+          {scheduleStatus === 'updating' && (
+            <span className="text-zinc-500 flex items-center gap-2">
+              <span className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </span>
+              Updating your schedule…
+            </span>
+          )}
+          {scheduleStatus === 'updated' && (
+            <span className="text-green-500">Schedule updated ✓</span>
+          )}
+          {scheduleStatus === 'error' && (
+            <button
+              onClick={() => lastCheckInRef.current && runCheckIn(lastCheckInRef.current)}
+              className="text-red-400 active:text-red-300"
+            >
+              Couldn&apos;t update schedule · Retry
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Input */}
       <div className="shrink-0 pt-2 flex gap-2 border-t border-zinc-800">
