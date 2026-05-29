@@ -88,7 +88,16 @@ ${ctx.summary || 'No prior conversation.'}
 </goal_data>
 Then ask: "Does that capture it? Say yes to save, or tell me what to adjust."
 
-**Accept a check-in:** When the user shares how their day went, extract what they did toward each goal and note it. Then reply confirming you've noted it. The client will save the log and trigger a schedule adjustment.
+**Log a check-in:** When the user describes how their day actually went — what they did or didn't do toward their goals — first reply warmly and briefly acknowledging it. Then, at the very END of your message, append a check-in tag mapping each goal they touched to a short progress note:
+<check_in>
+[{"goal_id":"<id from the Goals list>","notes":"<what they did or didn't do toward this goal>"}]
+</check_in>
+- Use the exact ids shown as [id:...] in the Goals list above.
+- Include goals they made NO progress on if they say so ("didn't get to X") — that signal matters for adjustment.
+- Only include goals the user actually mentioned. Never invent progress.
+- The user does NOT see this tag; your visible reply must stand on its own.
+- Emit the tag ONLY for genuine recaps of what already happened — never for plans ("I'm going to..."), questions, or hypotheticals. If you're unsure whether they're logging, ask "Want me to log that?" instead of emitting the tag.
+- If a log for today already appears in Recent Logs, fold that earlier progress into your notes so the new check-in doesn't erase it.
 
 **Delete a goal:** If the user asks to drop a goal, confirm once ("Drop [goal name] entirely?"), then on confirmation respond with:
 <delete_goal>{"id":"...","title":"..."}</delete_goal>
