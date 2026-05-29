@@ -42,8 +42,12 @@ export function extractCheckIn(text: string): CheckInEntry[] | null {
   if (!match) return null
   try {
     const parsed = JSON.parse(match[1].trim())
-    if (!Array.isArray(parsed) || parsed.length === 0) return null
-    return parsed
+    if (!Array.isArray(parsed)) return null
+    const valid = parsed.filter(
+      (e): e is CheckInEntry =>
+        !!e && typeof e.goal_id === 'string' && typeof e.notes === 'string'
+    )
+    return valid.length > 0 ? valid : null
   } catch {
     return null
   }

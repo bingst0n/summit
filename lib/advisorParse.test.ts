@@ -22,6 +22,16 @@ describe('extractCheckIn', () => {
   it('returns null on an empty array', () => {
     expect(extractCheckIn('<check_in>[]</check_in>')).toBeNull()
   })
+  it('drops malformed entries and keeps well-formed ones', () => {
+    const text = '<check_in>[{"goal_id":"g1","notes":"ok"},"junk",{"notes":"no id"},{"goal_id":"g2","notes":"ok2"}]</check_in>'
+    expect(extractCheckIn(text)).toEqual([
+      { goal_id: 'g1', notes: 'ok' },
+      { goal_id: 'g2', notes: 'ok2' },
+    ])
+  })
+  it('returns null when every entry is malformed', () => {
+    expect(extractCheckIn('<check_in>[1, 2, {"goal_id":5}]</check_in>')).toBeNull()
+  })
 })
 
 describe('extractGoalData', () => {
