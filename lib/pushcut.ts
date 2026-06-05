@@ -8,7 +8,7 @@ export async function sendCheckinNotification() {
     body: JSON.stringify({
       title: 'Daily Check-in',
       text: "How much work did you do today? Log your progress.",
-      url: `${process.env.NEXT_PUBLIC_APP_URL}/checkin`,
+      url: `${process.env.NEXT_PUBLIC_APP_URL}/advisor`,
     }),
   })
 
