@@ -9,21 +9,19 @@ import {
   getConversationState,
   upsertConversationState,
 } from '@/lib/db'
+import { today, localDate } from '@/lib/utils'
 
 export const maxDuration = 30
 
 export async function GET() {
-  const now = new Date()
-  const date = now.toISOString().split('T')[0]
-  const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
-
-  const horizonDate = new Date(now)
-  horizonDate.setDate(horizonDate.getDate() + 30)
-  const horizonStr = horizonDate.toISOString().split('T')[0]
-
-  const yesterday = new Date(now)
-  yesterday.setDate(yesterday.getDate() - 1)
-  const yesterdayStr = yesterday.toISOString().split('T')[0]
+  const date = today()
+  const time = new Date().toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/New_York',
+  })
+  const horizonStr = localDate(30)
 
   const [goals, todayTasks, todayLogs, recentLogs, lightDays] = await Promise.all([
     getGoals(),
@@ -79,28 +77,39 @@ export async function GET() {
   return new Response(
     new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          if (
-            chunk.type === 'content_block_delta' &&
-            chunk.delta.type === 'text_delta'
-          ) {
-            const text = chunk.delta.text
-            fullText += text
-            controller.enqueue(new TextEncoder().encode(text))
+        try {
+          for await (const chunk of stream) {
+            if (
+              chunk.type === 'content_block_delta' &&
+              chunk.delta.type === 'text_delta'
+            ) {
+              const text = chunk.delta.text
+              fullText += text
+              controller.enqueue(new TextEncoder().encode(text))
+            }
           }
+          controller.close()
+        } catch (err) {
+          console.error('Advisor brief stream error:', err)
+          try { controller.error(err) } catch { /* already errored */ }
         }
-        controller.close()
+
+        if (!fullText) return
 
         // Save brief as first assistant message in conversation_state
-        const state = await getConversationState()
-        const messages = [
-          { role: 'assistant' as const, content: fullText },
-          ...state.recent_messages,
-        ]
-        await upsertConversationState({
-          summary: state.summary,
-          recent_messages: messages.slice(0, 20),
-        })
+        try {
+          const state = await getConversationState()
+          const messages = [
+            { role: 'assistant' as const, content: fullText },
+            ...state.recent_messages,
+          ]
+          await upsertConversationState({
+            summary: state.summary,
+            recent_messages: messages.slice(0, 20),
+          })
+        } catch (err) {
+          console.error('Failed to persist brief to conversation state:', err)
+        }
       },
     }),
     { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }

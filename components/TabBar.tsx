@@ -34,6 +34,16 @@ const tabs = [
       </svg>
     ),
   },
+  {
+    href: '/history',
+    label: 'History',
+    icon: (active: boolean) => (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="9" fill={active ? 'currentColor' : 'none'} />
+        <polyline points="12,7 12,12 15.5,14" stroke={active ? '#18181b' : 'currentColor'} strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ]
 
 export default function TabBar() {

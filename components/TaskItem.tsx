@@ -10,7 +10,15 @@ interface TaskItemProps {
 
 export default function TaskItem({ task, goal, onToggle }: TaskItemProps) {
   const [completed, setCompleted] = useState(task.completed)
+  const [serverValue, setServerValue] = useState(task.completed)
   const [pending, setPending] = useState(false)
+
+  // Re-sync optimistic state when the server sends a new value (e.g. after
+  // router.refresh()). React's "adjust state during render" pattern — no effect.
+  if (task.completed !== serverValue) {
+    setServerValue(task.completed)
+    setCompleted(task.completed)
+  }
 
   async function handleToggle() {
     if (pending) return

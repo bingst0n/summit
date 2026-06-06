@@ -1,5 +1,3 @@
-'use client'
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { getAllLogs, getGoals } from '@/lib/db'
 import type { DailyLog, Goal } from '@/lib/types'
@@ -9,41 +7,34 @@ interface DayEntry {
   logs: Array<{ log: DailyLog; goal: Goal | undefined }>
 }
 
-export default function HistoryPage() {
-  const [days, setDays] = useState<DayEntry[]>([])
-  const [loading, setLoading] = useState(true)
+export default async function HistoryPage() {
+  const [logs, goals] = await Promise.all([getAllLogs(), getGoals()])
+  const goalMap = new Map(goals.map(g => [g.id, g]))
 
-  useEffect(() => {
-    Promise.all([getAllLogs(), getGoals()]).then(([logs, goals]) => {
-      const goalMap = new Map(goals.map(g => [g.id, g]))
-      const byDate = new Map<string, DayEntry>()
-      for (const log of logs) {
-        if (!byDate.has(log.date)) byDate.set(log.date, { date: log.date, logs: [] })
-        byDate.get(log.date)!.logs.push({ log, goal: goalMap.get(log.goal_id) })
-      }
-      setDays(Array.from(byDate.values()))
-      setLoading(false)
-    })
-  }, [])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-zinc-500 text-sm">Loading...</div>
-      </div>
-    )
+  // getAllLogs() is already ordered date-desc, so insertion order is correct.
+  const byDate = new Map<string, DayEntry>()
+  for (const log of logs) {
+    if (!byDate.has(log.date)) byDate.set(log.date, { date: log.date, logs: [] })
+    byDate.get(log.date)!.logs.push({ log, goal: goalMap.get(log.goal_id) })
   }
+  const days = Array.from(byDate.values())
 
   return (
     <div className="px-4 pt-safe pb-safe">
-      <div className="py-6 flex items-center justify-between">
+      <div className="py-6">
         <h1 className="text-3xl font-bold tracking-tight">History</h1>
-        <Link href="/" className="text-zinc-500 text-sm">← Home</Link>
+        <p className="text-zinc-500 text-sm mt-1">Your check-in log</p>
       </div>
 
       {days.length === 0 ? (
         <div className="bg-zinc-900 rounded-2xl p-8 text-center border border-zinc-800">
-          <p className="text-zinc-400 text-sm">No check-ins yet.</p>
+          <p className="text-zinc-400 text-sm mb-4">No check-ins yet.</p>
+          <Link
+            href="/advisor"
+            className="inline-block bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+          >
+            Open Advisor
+          </Link>
         </div>
       ) : (
         <div className="space-y-6">

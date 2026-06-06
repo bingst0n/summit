@@ -7,6 +7,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  await sendCheckinNotification()
-  return NextResponse.json({ ok: true })
+  try {
+    await sendCheckinNotification()
+    return NextResponse.json({ ok: true })
+  } catch (err) {
+    console.error('Cron check-in notification failed:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }

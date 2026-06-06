@@ -26,3 +26,35 @@ body {
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
   }
 }
+
+/* Motion: page transitions + bottom sheet */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.page-enter {
+  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-sheet-up {
+  animation: sheet-up 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .animate-sheet-up,
+  .animate-fade-in {
+    animation: none;
+  }
+}

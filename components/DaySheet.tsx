@@ -20,24 +20,30 @@ function formatDateHeader(dateStr: string): string {
 }
 
 export default function DaySheet({ date, tasks, goals, isLight, onClose, onLightToggle }: DaySheetProps) {
-  const [lightState, setLightState] = useState(isLight)
   const [toggling, setToggling] = useState(false)
   const goalMap = Object.fromEntries(goals.map(g => [g.id, g]))
 
+  // Controlled off the `isLight` prop (the parent's lightDays set is the single
+  // source of truth), so switching days always shows that day's real state.
   async function handleLightToggle() {
     if (toggling) return
     setToggling(true)
-    const next = !lightState
-    setLightState(next)
+    const optimistic = !isLight
+    onLightToggle(date, optimistic) // optimistic; prop flips on parent re-render
     try {
-      await fetch('/api/calendar-marks', {
+      const res = await fetch('/api/calendar-marks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date }),
       })
-      onLightToggle(date, next)
+      if (!res.ok) throw new Error(`calendar-marks ${res.status}`)
+      const data = await res.json()
+      // Reconcile with the server's authoritative toggle result.
+      if (typeof data.isLight === 'boolean' && data.isLight !== optimistic) {
+        onLightToggle(date, data.isLight)
+      }
     } catch {
-      setLightState(!next)
+      onLightToggle(date, isLight) // revert to the pre-toggle state
     } finally {
       setToggling(false)
     }
@@ -47,12 +53,12 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 z-40"
+        className="fixed inset-0 bg-black/50 z-40 animate-fade-in"
         onClick={onClose}
       />
 
       {/* Sheet */}
-      <div className="fixed bottom-0 inset-x-0 z-50 bg-zinc-900 border-t border-zinc-800 rounded-t-2xl max-h-[70vh] overflow-y-auto">
+      <div className="fixed bottom-0 inset-x-0 z-50 bg-zinc-900 border-t border-zinc-800 rounded-t-2xl max-h-[70vh] overflow-y-auto animate-sheet-up">
         <div className="max-w-lg mx-auto px-4 pt-4 pb-[env(safe-area-inset-bottom,24px)]">
           {/* Handle */}
           <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
@@ -72,13 +78,16 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
             <button
               onClick={handleLightToggle}
               disabled={toggling}
+              role="switch"
+              aria-checked={isLight}
+              aria-label="Light day"
               className={`w-12 h-6 rounded-full transition-colors relative ${
-                lightState ? 'bg-amber-500' : 'bg-zinc-700'
+                isLight ? 'bg-amber-500' : 'bg-zinc-700'
               }`}
             >
               <span
                 className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  lightState ? 'translate-x-[26px]' : 'translate-x-0.5'
+                  isLight ? 'translate-x-[26px]' : 'translate-x-0.5'
                 }`}
               />
             </button>

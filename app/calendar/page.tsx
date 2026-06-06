@@ -24,6 +24,7 @@ export default async function CalendarPage({
 
   return (
     <CalendarPageClient
+      key={date ?? 'default'}
       initialYear={year}
       initialMonth={month}
       initialTasks={tasks}

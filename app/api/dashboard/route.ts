@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { getGoals, getTodayTasks, getLogsForDate } from '@/lib/db'
+import { today } from '@/lib/utils'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const date = searchParams.get('date') ?? new Date().toISOString().split('T')[0]
+  const date = searchParams.get('date') ?? today()
 
   try {
     const [goals, todayTasks, todayLogs] = await Promise.all([

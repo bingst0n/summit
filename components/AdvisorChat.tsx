@@ -47,8 +47,10 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
   }, [briefText])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // Instant during streaming so each token doesn't restart a smooth-scroll
+    // animation (which fights the user and looks janky); smooth otherwise.
+    bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' })
+  }, [messages, streaming])
 
   useEffect(() => {
     if (!saving) {
@@ -85,7 +87,9 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
       if (!res.ok) throw new Error(`checkin ${res.status}`)
 
       const goalIds = [...new Set(checkIn.map(c => c.goal_id))]
-      await Promise.all(
+      // allSettled: one goal's adjustment failing shouldn't abort the others.
+      // The log is already saved, so the retry button can safely re-run this.
+      const results = await Promise.allSettled(
         goalIds.map(id =>
           fetch('/api/adjust', {
             method: 'POST',
@@ -97,9 +101,13 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
         )
       )
 
-      setScheduleStatus('updated')
       router.refresh()
-      setTimeout(() => setScheduleStatus('idle'), 3000)
+      if (results.some(r => r.status === 'rejected')) {
+        setScheduleStatus('error')
+      } else {
+        setScheduleStatus('updated')
+        setTimeout(() => setScheduleStatus('idle'), 3000)
+      }
     } catch {
       setScheduleStatus('error')
     }
@@ -113,27 +121,40 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setStreaming(true)
 
-    const res = await fetch('/api/advisor/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: userText }),
-    })
-
-    const reader = res.body!.getReader()
-    const decoder = new TextDecoder()
     let text = ''
+    let ok = false
+    try {
+      const res = await fetch('/api/advisor/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userText }),
+      })
+      if (!res.ok || !res.body) throw new Error(`chat ${res.status}`)
 
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      text += decoder.decode(value, { stream: true })
-      setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: text }])
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        text += decoder.decode(value, { stream: true })
+        setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: text }])
+      }
+      ok = true
+    } catch {
+      // Replace the empty placeholder bubble with an error so the input doesn't
+      // stay disabled forever (finally re-enables it).
+      setMessages(prev => [
+        ...prev.slice(0, -1),
+        { role: 'assistant', content: text || "⚠️ Couldn't reach the advisor. Tap Send to try again." },
+      ])
+    } finally {
+      setStreaming(false)
     }
 
-    setStreaming(false)
-
-    const checkIn = extractCheckIn(text)
-    if (checkIn) runCheckIn(checkIn)
+    if (ok) {
+      const checkIn = extractCheckIn(text)
+      if (checkIn) runCheckIn(checkIn)
+    }
   }
 
   async function saveGoal() {

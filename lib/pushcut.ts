@@ -1,6 +1,9 @@
 export async function sendCheckinNotification() {
-  const apiKey = process.env.PUSHCUT_API_KEY!
-  const name = process.env.PUSHCUT_NOTIFICATION_NAME!
+  const apiKey = process.env.PUSHCUT_API_KEY
+  const name = process.env.PUSHCUT_NOTIFICATION_NAME
+  if (!apiKey || !name) {
+    throw new Error('PUSHCUT_API_KEY or PUSHCUT_NOTIFICATION_NAME is not set')
+  }
 
   const res = await fetch(`https://api.pushcut.io/v1/notifications/${encodeURIComponent(name)}`, {
     method: 'POST',

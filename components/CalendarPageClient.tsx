@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import type { DailyTask, Goal } from '@/lib/types'
 import CalendarGrid from '@/components/CalendarGrid'
 import DaySheet from '@/components/DaySheet'
@@ -28,23 +28,37 @@ export default function CalendarPageClient({
   const [lightDays, setLightDays] = useState(new Set(initialLightDayDates))
   const [selectedDate, setSelectedDate] = useState<string | null>(initialDate)
   const [loading, setLoading] = useState(false)
+  const reqId = useRef(0)
+
+  // Note: the open day is seeded from initialDate. A deep-link like
+  // /calendar?date=... re-syncs because the parent keys this component on the
+  // date param (remount), which avoids a setState-in-effect.
 
   const fetchMonth = useCallback(async (y: number, m: number) => {
+    const id = ++reqId.current
     setLoading(true)
     const start = `${y}-${String(m + 1).padStart(2, '0')}-01`
     const lastDay = new Date(y, m + 1, 0).getDate()
     const end = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-    const [tasksRes, marksRes, goalsRes] = await Promise.all([
-      fetch(`/api/tasks?start=${start}&end=${end}`).then(r => r.json()),
-      fetch('/api/calendar-marks').then(r => r.json()),
-      fetch(`/api/dashboard?date=${start}`).then(r => r.json()),
-    ])
-
-    setTasks(tasksRes.tasks ?? [])
-    setLightDays(new Set((marksRes.marks ?? []).map((m: { date: string }) => m.date)))
-    setGoals(goalsRes.goals ?? [])
-    setLoading(false)
+    const safeJson = <T,>(r: Response): Promise<T> =>
+      r.ok ? (r.json() as Promise<T>) : Promise.resolve({} as T)
+    try {
+      const [tasksRes, marksRes, goalsRes] = await Promise.all([
+        fetch(`/api/tasks?start=${start}&end=${end}`).then(safeJson<{ tasks?: DailyTask[] }>),
+        fetch('/api/calendar-marks').then(safeJson<{ marks?: { date: string }[] }>),
+        fetch(`/api/dashboard?date=${start}`).then(safeJson<{ goals?: Goal[] }>),
+      ])
+      // Ignore a stale response if a newer month was requested meanwhile.
+      if (id !== reqId.current) return
+      setTasks(tasksRes.tasks ?? [])
+      setLightDays(new Set((marksRes.marks ?? []).map(mk => mk.date)))
+      setGoals(goalsRes.goals ?? [])
+    } catch (err) {
+      console.error('Calendar month fetch failed:', err)
+    } finally {
+      if (id === reqId.current) setLoading(false)
+    }
   }, [])
 
   function prevMonth() {

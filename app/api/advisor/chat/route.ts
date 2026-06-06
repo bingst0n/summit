@@ -12,26 +12,35 @@ import {
   getConversationState,
   upsertConversationState,
 } from '@/lib/db'
+import { today, localDate } from '@/lib/utils'
 
 export const maxDuration = 60
 
 export async function GET() {
-  const state = await getConversationState()
-  return NextResponse.json({ messages: state.recent_messages })
+  try {
+    const state = await getConversationState()
+    return NextResponse.json({ messages: state.recent_messages })
+  } catch (err) {
+    console.error('Advisor history error:', err)
+    return NextResponse.json({ messages: [] })
+  }
 }
 
 export async function POST(req: Request) {
-  const { message } = await req.json()
+  let message: string
+  try {
+    const body = await req.json()
+    message = body.message
+  } catch {
+    return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
+  }
 
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'message required' }, { status: 400 })
   }
 
-  const now = new Date()
-  const date = now.toISOString().split('T')[0]
-  const horizonDate = new Date(now)
-  horizonDate.setDate(horizonDate.getDate() + 30)
-  const horizonStr = horizonDate.toISOString().split('T')[0]
+  const date = today()
+  const horizonStr = localDate(30)
 
   const [goals, todayTasks, recentLogs, lightDays, state] = await Promise.all([
     getGoals(),
@@ -90,66 +99,80 @@ export async function POST(req: Request) {
   return new Response(
     new ReadableStream({
       async start(controller) {
-        for await (const chunk of stream) {
-          if (
-            chunk.type === 'content_block_delta' &&
-            chunk.delta.type === 'text_delta'
-          ) {
-            const text = chunk.delta.text
-            fullResponse += text
-            controller.enqueue(new TextEncoder().encode(text))
-          }
-        }
-        controller.close()
-
-        const updatedMessages = [
-          ...state.recent_messages,
-          { role: 'user' as const, content: message },
-          { role: 'assistant' as const, content: fullResponse },
-        ]
-
-        if (updatedMessages.length <= 20) {
-          await upsertConversationState({
-            summary: state.summary,
-            recent_messages: updatedMessages,
-          })
-          return
-        }
-
-        // Compress oldest 10 into summary
-        const toCompress = updatedMessages.slice(0, 10)
-        const remaining = updatedMessages.slice(10)
-
-        const compressionText = toCompress
-          .map(m => `${m.role}: ${m.content}`)
-          .join('\n\n')
-
         try {
-          const compressionMsg = await anthropic.messages.create({
-            model: 'claude-haiku-4-5-20251001',
-            max_tokens: 256,
-            system: COMPRESSION_SYSTEM,
-            messages: [{ role: 'user', content: compressionText }],
-          })
-          const newSummaryChunk =
-            compressionMsg.content[0].type === 'text'
-              ? compressionMsg.content[0].text
-              : ''
+          for await (const chunk of stream) {
+            if (
+              chunk.type === 'content_block_delta' &&
+              chunk.delta.type === 'text_delta'
+            ) {
+              const text = chunk.delta.text
+              fullResponse += text
+              controller.enqueue(new TextEncoder().encode(text))
+            }
+          }
+          controller.close()
+        } catch (err) {
+          console.error('Advisor chat stream error:', err)
+          try { controller.error(err) } catch { /* already errored */ }
+        }
 
-          const combinedSummary = state.summary
-            ? `${state.summary}\n\n${newSummaryChunk}`
-            : newSummaryChunk
+        // Don't persist an empty turn (stream died before producing any text).
+        if (!fullResponse) return
 
-          await upsertConversationState({
-            summary: combinedSummary,
-            recent_messages: remaining,
-          })
-        } catch {
-          // Compression failed — save without compressing
-          await upsertConversationState({
-            summary: state.summary,
-            recent_messages: updatedMessages.slice(-20),
-          })
+        // Persist whatever streamed (even a partial response) so the turn
+        // isn't lost if the stream errored midway.
+        try {
+          const updatedMessages = [
+            ...state.recent_messages,
+            { role: 'user' as const, content: message },
+            { role: 'assistant' as const, content: fullResponse },
+          ]
+
+          if (updatedMessages.length <= 20) {
+            await upsertConversationState({
+              summary: state.summary,
+              recent_messages: updatedMessages,
+            })
+            return
+          }
+
+          // Compress oldest 10 into summary
+          const toCompress = updatedMessages.slice(0, 10)
+          const remaining = updatedMessages.slice(10)
+
+          const compressionText = toCompress
+            .map(m => `${m.role}: ${m.content}`)
+            .join('\n\n')
+
+          try {
+            const compressionMsg = await anthropic.messages.create({
+              model: 'claude-haiku-4-5-20251001',
+              max_tokens: 256,
+              system: COMPRESSION_SYSTEM,
+              messages: [{ role: 'user', content: compressionText }],
+            })
+            const newSummaryChunk =
+              compressionMsg.content[0].type === 'text'
+                ? compressionMsg.content[0].text
+                : ''
+
+            const combinedSummary = state.summary
+              ? `${state.summary}\n\n${newSummaryChunk}`
+              : newSummaryChunk
+
+            await upsertConversationState({
+              summary: combinedSummary,
+              recent_messages: remaining,
+            })
+          } catch {
+            // Compression failed — save without compressing
+            await upsertConversationState({
+              summary: state.summary,
+              recent_messages: updatedMessages.slice(-20),
+            })
+          }
+        } catch (err) {
+          console.error('Failed to persist conversation state:', err)
         }
       },
     }),

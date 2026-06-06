@@ -1,4 +1,5 @@
 import { supabase, supabaseServer } from './supabase'
+import { localDate } from './utils'
 import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState } from './types'
 
 function db() {
@@ -72,9 +73,7 @@ export async function createDailyTasks(
 }
 
 export async function getFutureTasksForGoal(goalId: string): Promise<DailyTask[]> {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const date = tomorrow.toISOString().split('T')[0]
+  const date = localDate(1)
   const { data } = await db()
     .from('daily_tasks')
     .select('*')
@@ -88,23 +87,39 @@ export async function replaceFutureTasks(
   goalId: string,
   tasks: Array<{ date: string; description: string }>
 ) {
-  const tomorrow = new Date()
-  tomorrow.setDate(tomorrow.getDate() + 1)
-  const date = tomorrow.toISOString().split('T')[0]
+  const date = localDate(1)
+  if (tasks.length === 0) return // never wipe the schedule with nothing to replace it
+
+  // Snapshot the current future tasks so a failed insert can be rolled back
+  // instead of leaving the goal with no schedule at all.
+  const { data: snapshot } = await db()
+    .from('daily_tasks')
+    .select('date, description')
+    .eq('goal_id', goalId)
+    .gte('date', date)
+
   const { error: delErr } = await db()
     .from('daily_tasks')
     .delete()
     .eq('goal_id', goalId)
     .gte('date', date)
   if (delErr) throw delErr
-  if (tasks.length === 0) return
+
   const rows = tasks.map(t => ({
     goal_id: goalId,
     date: t.date,
     description: t.description,
   }))
   const { error } = await db().from('daily_tasks').insert(rows)
-  if (error) throw error
+  if (error) {
+    // Restore the snapshot so the check-in doesn't destroy the existing plan.
+    if (snapshot && snapshot.length > 0) {
+      await db()
+        .from('daily_tasks')
+        .insert(snapshot.map(t => ({ goal_id: goalId, date: t.date, description: t.description })))
+    }
+    throw error
+  }
 }
 
 export async function getLogsForDate(date: string): Promise<DailyLog[]> {
@@ -113,9 +128,7 @@ export async function getLogsForDate(date: string): Promise<DailyLog[]> {
 }
 
 export async function getLogsForGoal(goalId: string, days: number): Promise<DailyLog[]> {
-  const since = new Date()
-  since.setDate(since.getDate() - days)
-  const date = since.toISOString().split('T')[0]
+  const date = localDate(-days)
   const { data } = await db()
     .from('daily_logs')
     .select('*')
@@ -134,9 +147,7 @@ export async function getAllLogs(): Promise<DailyLog[]> {
 }
 
 export async function getRecentLogs(days: number): Promise<DailyLog[]> {
-  const since = new Date()
-  since.setDate(since.getDate() - days)
-  const date = since.toISOString().split('T')[0]
+  const date = localDate(-days)
   const { data } = await db()
     .from('daily_logs')
     .select('*')

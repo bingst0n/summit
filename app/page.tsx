@@ -1,17 +1,13 @@
 import Link from 'next/link'
 import type { DailyTask } from '@/lib/types'
 import { getGoals, getTodayTasks, getLogsForDate, getTasksInRange } from '@/lib/db'
-import { today, daysUntil, SUMMER_END } from '@/lib/utils'
+import { today, localDate, daysUntil, SUMMER_END } from '@/lib/utils'
 import TaskItem from '@/components/TaskItem'
 
 export default async function HomePage() {
   const date = today()
 
-  const upcomingDays = Array.from({ length: 3 }, (_, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() + i + 1)
-    return d.toISOString().split('T')[0]
-  })
+  const upcomingDays = Array.from({ length: 3 }, (_, i) => localDate(i + 1))
 
   const [goals, todayTasks, todayLogs, upcomingArr] = await Promise.all([
     getGoals(),
@@ -35,7 +31,7 @@ export default async function HomePage() {
       {/* Header */}
       <div className="py-6">
         <p className="text-zinc-500 text-sm">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}
         </p>
         <h1 className="text-3xl font-bold mt-1 tracking-tight">Summit</h1>
         <p className="text-zinc-500 text-sm mt-1">{daysLeft} days left this summer</p>

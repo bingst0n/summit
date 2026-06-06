@@ -1,5 +1,6 @@
 'use client'
 import type { DailyTask, Goal } from '@/lib/types'
+import { today as currentDate } from '@/lib/utils'
 
 interface CalendarGridProps {
   year: number
@@ -24,7 +25,7 @@ export default function CalendarGrid({
   selectedDate,
   onSelectDate,
 }: CalendarGridProps) {
-  const today = new Date().toISOString().split('T')[0]
+  const today = currentDate()
   const goalMap = Object.fromEntries(goals.map(g => [g.id, g]))
 
   // Build map: date → Set of goal colors
