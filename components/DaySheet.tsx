@@ -85,9 +85,13 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
                 isLight ? 'bg-amber-500' : 'bg-zinc-700'
               }`}
             >
+              {/* left-0.5 is load-bearing: without an explicit horizontal anchor,
+                  an absolutely-positioned knob falls back to its *static* position,
+                  which the button's UA text-align:center puts at the track's center
+                  — the knob then renders past the right edge when toggled on. */}
               <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                  isLight ? 'translate-x-[26px]' : 'translate-x-0.5'
+                className={`absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                  isLight ? 'translate-x-6' : 'translate-x-0'
                 }`}
               />
             </button>
