@@ -10,11 +10,26 @@ import {
   upsertConversationState,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
+import { needsBrief } from '@/lib/conversation'
+import type { ChatMessage } from '@/lib/types'
 
 export const maxDuration = 30
 
 export async function GET() {
   const date = today()
+
+  // Cheap gate first: most opens don't need a brief at all, so don't pay for
+  // the full context fetch (let alone the LLM call) until we know we do.
+  const [state, todayLogs] = await Promise.all([
+    getConversationState(),
+    getLogsForDate(date),
+  ])
+  const loggedToday = todayLogs.length > 0
+
+  if (!needsBrief(state.recent_messages, { loggedToday })) {
+    return new Response(null, { status: 204 })
+  }
+
   const time = new Date().toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit',
@@ -23,15 +38,12 @@ export async function GET() {
   })
   const horizonStr = localDate(30)
 
-  const [goals, todayTasks, todayLogs, recentLogs, lightDays] = await Promise.all([
+  const [goals, todayTasks, recentLogs, lightDays] = await Promise.all([
     getGoals(),
     getTodayTasks(date),
-    getLogsForDate(date),
     getRecentLogs(7),
     getLightDays(date, horizonStr),
   ])
-
-  const loggedToday = todayLogs.length > 0
 
   const goalsSummary = goals.length === 0
     ? 'No goals set.'
@@ -55,6 +67,13 @@ export async function GET() {
     ? 'None.'
     : lightDays.join(', ')
 
+  const recentConversation = state.recent_messages.length === 0
+    ? 'None yet — this is your first message to the user.'
+    : state.recent_messages
+        .slice(-6)
+        .map(m => `${m.role === 'assistant' ? 'You' : 'User'}: ${m.content}`)
+        .join('\n\n')
+
   const systemPrompt = ADVISOR_BRIEF_SYSTEM({
     date,
     time,
@@ -63,6 +82,8 @@ export async function GET() {
     loggedToday,
     recentLogs: logsSummary,
     lightDays: lightDaySummary,
+    summary: state.summary,
+    recentConversation,
   })
 
   let fullText = ''
@@ -96,16 +117,23 @@ export async function GET() {
 
         if (!fullText) return
 
-        // Save brief as first assistant message in conversation_state
+        // Append the brief to the conversation in chronological order.
+        // Re-read state right before writing: generation took seconds, and a
+        // concurrent request (double-mount, second device) may have persisted
+        // a brief already — in that case drop this one instead of stacking.
         try {
-          const state = await getConversationState()
-          const messages = [
-            { role: 'assistant' as const, content: fullText },
-            ...state.recent_messages,
-          ]
+          const fresh = await getConversationState()
+          if (!needsBrief(fresh.recent_messages, { loggedToday })) return
+
+          const briefMessage: ChatMessage = {
+            role: 'assistant',
+            content: fullText,
+            kind: 'brief',
+            ts: new Date().toISOString(),
+          }
           await upsertConversationState({
-            summary: state.summary,
-            recent_messages: messages.slice(0, 20),
+            summary: fresh.summary,
+            recent_messages: [...fresh.recent_messages, briefMessage].slice(-20),
           })
         } catch (err) {
           console.error('Failed to persist brief to conversation state:', err)

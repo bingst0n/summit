@@ -1,14 +1,16 @@
--- Summit v2 migrations — run in Supabase SQL Editor
-alter table daily_tasks add column if not exists completed boolean not null default false;
-alter table goals add column if not exists color text not null default '#6366f1';
-create table if not exists calendar_marks (
-  date date primary key,
-  capacity text not null default 'light' check (capacity in ('light')),
-  created_at timestamptz default now()
-);
-create table if not exists conversation_state (
-  id integer primary key default 1,
-  summary text not null default '',
-  recent_messages jsonb not null default '[]',
-  updated_at timestamptz default now()
-);
+-- Summit: one-time cleanup after the advisor messaging fix (2026-06-07)
+-- The old brief route PREPENDED briefs to recent_messages, so the stored
+-- conversation is scrambled (stale briefs stacked at the front, newest
+-- trimmed instead of oldest). It also contains two test messages from
+-- verifying the fix. Keep the compressed summary; clear just the message
+-- list — the next app open generates one fresh, correctly-ordered brief.
+-- Run in Supabase SQL Editor.
+
+update conversation_state
+set recent_messages = '[]'::jsonb,
+    updated_at = now()
+where id = 1;
+
+-- Verify:
+-- select summary, jsonb_array_length(recent_messages) as msgs
+-- from conversation_state where id = 1;
