@@ -28,6 +28,14 @@ export function daysUntil(dateStr: string): number {
   return Math.round(ms / 86_400_000)
 }
 
+/**
+ * Bulk light-day action semantics: if every selected day is already light,
+ * the action clears them; otherwise (mixed or none) it marks them all light.
+ */
+export function bulkLightAction(selected: string[], lightDays: Set<string>): 'mark' | 'clear' {
+  return selected.length > 0 && selected.every(d => lightDays.has(d)) ? 'clear' : 'mark'
+}
+
 export function formatDate(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
     month: 'short',

@@ -10,6 +10,8 @@ interface CalendarGridProps {
   lightDays: Set<string>
   selectedDate: string | null
   onSelectDate: (date: string) => void
+  selectMode?: boolean
+  selectedDays?: Set<string>
 }
 
 function toDateStr(year: number, month: number, day: number): string {
@@ -24,6 +26,8 @@ export default function CalendarGrid({
   lightDays,
   selectedDate,
   onSelectDate,
+  selectMode = false,
+  selectedDays,
 }: CalendarGridProps) {
   const today = currentDate()
   const goalMap = Object.fromEntries(goals.map(g => [g.id, g]))
@@ -62,7 +66,8 @@ export default function CalendarGrid({
 
           const dateStr = toDateStr(year, month, day)
           const isToday = dateStr === today
-          const isSelected = dateStr === selectedDate
+          const isSelected = !selectMode && dateStr === selectedDate
+          const isPicked = selectMode && (selectedDays?.has(dateStr) ?? false)
           const isLight = lightDays.has(dateStr)
           const colors = taskColors[dateStr] ? Array.from(taskColors[dateStr]) : []
 
@@ -70,8 +75,11 @@ export default function CalendarGrid({
             <button
               key={i}
               onClick={() => onSelectDate(dateStr)}
+              aria-pressed={selectMode ? isPicked : undefined}
               className={`relative flex flex-col items-center py-2 rounded-lg transition-colors ${
-                isSelected
+                isPicked
+                  ? 'bg-indigo-500/25 ring-2 ring-indigo-400'
+                  : isSelected
                   ? 'bg-indigo-600'
                   : isLight
                   ? 'bg-amber-950/40'

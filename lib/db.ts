@@ -202,6 +202,20 @@ export async function toggleCalendarMark(date: string): Promise<boolean> {
   }
 }
 
+export async function setLightDays(dates: string[], light: boolean) {
+  if (dates.length === 0) return
+  if (light) {
+    const rows = dates.map(date => ({ date, capacity: 'light' as const }))
+    const { error } = await db()
+      .from('calendar_marks')
+      .upsert(rows, { onConflict: 'date', ignoreDuplicates: true })
+    if (error) throw error
+  } else {
+    const { error } = await db().from('calendar_marks').delete().in('date', dates)
+    if (error) throw error
+  }
+}
+
 export async function getConversationState(): Promise<ConversationState> {
   const { data } = await db()
     .from('conversation_state')

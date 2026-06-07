@@ -1,6 +1,7 @@
 'use client'
 import { useState, useCallback, useRef } from 'react'
 import type { DailyTask, Goal } from '@/lib/types'
+import { bulkLightAction } from '@/lib/utils'
 import CalendarGrid from '@/components/CalendarGrid'
 import DaySheet from '@/components/DaySheet'
 
@@ -28,6 +29,9 @@ export default function CalendarPageClient({
   const [lightDays, setLightDays] = useState(new Set(initialLightDayDates))
   const [selectedDate, setSelectedDate] = useState<string | null>(initialDate)
   const [loading, setLoading] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [pickedDays, setPickedDays] = useState<Set<string>>(new Set())
+  const [applying, setApplying] = useState(false)
   const reqId = useRef(0)
 
   // Note: the open day is seeded from initialDate. A deep-link like
@@ -79,6 +83,7 @@ export default function CalendarPageClient({
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
   const selectedDayTasks = selectedDate ? tasks.filter(t => t.date === selectedDate) : []
+  const bulkAction = bulkLightAction([...pickedDays], lightDays)
 
   function handleLightToggle(date: string, isLight: boolean) {
     setLightDays(prev => {
@@ -87,6 +92,60 @@ export default function CalendarPageClient({
       else next.delete(date)
       return next
     })
+  }
+
+  function enterSelectMode() {
+    setSelectMode(true)
+    setSelectedDate(null) // close the day sheet
+    setPickedDays(new Set())
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setPickedDays(new Set())
+  }
+
+  function handleDayTap(d: string) {
+    if (selectMode) {
+      setPickedDays(prev => {
+        const next = new Set(prev)
+        if (next.has(d)) next.delete(d)
+        else next.add(d)
+        return next
+      })
+    } else {
+      setSelectedDate(prev => (prev === d ? null : d))
+    }
+  }
+
+  async function applyBulkLight() {
+    if (applying || pickedDays.size === 0) return
+    const dates = [...pickedDays]
+    const makeLight = bulkAction === 'mark'
+    setApplying(true)
+    const prev = new Set(lightDays)
+    // Optimistic: converge all picked days to the target state.
+    setLightDays(s => {
+      const next = new Set(s)
+      for (const d of dates) {
+        if (makeLight) next.add(d)
+        else next.delete(d)
+      }
+      return next
+    })
+    try {
+      const res = await fetch('/api/calendar-marks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dates, light: makeLight }),
+      })
+      if (!res.ok) throw new Error(`calendar-marks bulk ${res.status}`)
+      exitSelectMode()
+    } catch {
+      setLightDays(prev) // revert the optimistic update
+    } finally {
+      setApplying(false)
+    }
   }
 
   return (
@@ -107,6 +166,19 @@ export default function CalendarPageClient({
         </button>
       </div>
 
+      {/* Select / Cancel (bulk light-day editing) */}
+      <div className="flex items-center justify-between -mt-3 mb-2 min-h-7">
+        <span className="text-xs text-zinc-500">
+          {selectMode ? 'Tap days to select' : ''}
+        </span>
+        <button
+          onClick={selectMode ? exitSelectMode : enterSelectMode}
+          className="text-sm font-medium text-indigo-400 active:text-indigo-300 py-1 px-1"
+        >
+          {selectMode ? 'Cancel' : 'Select'}
+        </button>
+      </div>
+
       <CalendarGrid
         year={year}
         month={month}
@@ -114,10 +186,12 @@ export default function CalendarPageClient({
         goals={goals}
         lightDays={lightDays}
         selectedDate={selectedDate}
-        onSelectDate={d => setSelectedDate(prev => prev === d ? null : d)}
+        onSelectDate={handleDayTap}
+        selectMode={selectMode}
+        selectedDays={pickedDays}
       />
 
-      {selectedDate && (
+      {selectedDate && !selectMode && (
         <DaySheet
           date={selectedDate}
           tasks={selectedDayTasks}
@@ -126,6 +200,33 @@ export default function CalendarPageClient({
           onClose={() => setSelectedDate(null)}
           onLightToggle={handleLightToggle}
         />
+      )}
+
+      {/* Bulk action bar — floats above the TabBar while selecting */}
+      {selectMode && pickedDays.size > 0 && (
+        <div
+          className="fixed inset-x-0 z-30 animate-sheet-up"
+          style={{ bottom: 'calc(66px + max(env(safe-area-inset-bottom, 0px), 0.5rem))' }}
+        >
+          <div className="max-w-lg mx-auto px-4 pb-2">
+            <div className="flex items-center justify-between bg-zinc-900/95 backdrop-blur border border-zinc-800 rounded-2xl px-4 py-3 shadow-lg">
+              <span className="text-sm text-zinc-300">
+                {pickedDays.size} day{pickedDays.size !== 1 ? 's' : ''} selected
+              </span>
+              <button
+                onClick={applyBulkLight}
+                disabled={applying}
+                className={`text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 ${
+                  bulkAction === 'clear'
+                    ? 'bg-zinc-700 text-zinc-200 active:bg-zinc-600'
+                    : 'bg-amber-500 text-zinc-950 active:bg-amber-400'
+                }`}
+              >
+                {applying ? 'Saving…' : bulkAction === 'clear' ? 'Remove light' : 'Mark as light'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

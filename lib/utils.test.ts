@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { localDate, today, daysUntil } from './utils'
+import { localDate, today, daysUntil, bulkLightAction } from './utils'
 
 describe('localDate (America/New_York anchored)', () => {
   it('returns the Eastern date, not the UTC date, late in the evening', () => {
@@ -43,5 +43,25 @@ describe('daysUntil', () => {
     expect(daysUntil(today())).toBe(0)
     expect(daysUntil(localDate(5))).toBe(5)
     expect(daysUntil(localDate(-3))).toBe(-3)
+  })
+})
+
+describe('bulkLightAction', () => {
+  it('clears only when every selected day is already light', () => {
+    const light = new Set(['2026-06-10', '2026-06-11'])
+    expect(bulkLightAction(['2026-06-10', '2026-06-11'], light)).toBe('clear')
+  })
+
+  it('marks when the selection is mixed', () => {
+    const light = new Set(['2026-06-10'])
+    expect(bulkLightAction(['2026-06-10', '2026-06-12'], light)).toBe('mark')
+  })
+
+  it('marks when nothing selected is light', () => {
+    expect(bulkLightAction(['2026-06-12'], new Set())).toBe('mark')
+  })
+
+  it('marks for an empty selection', () => {
+    expect(bulkLightAction([], new Set(['2026-06-10']))).toBe('mark')
   })
 })
