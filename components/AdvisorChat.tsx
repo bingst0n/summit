@@ -14,13 +14,10 @@ import { today } from '@/lib/utils'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
-interface AdvisorChatProps {
-  briefText: string
-}
-
-export default function AdvisorChat({ briefText }: AdvisorChatProps) {
+export default function AdvisorChat() {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const [input, setInput] = useState('')
   const [streaming, setStreaming] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -31,20 +28,62 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Brief is the first message; then load history
+  // History renders immediately (plain DB read); the brief — if the server
+  // decides one is due — streams in afterwards as a new bubble.
   useEffect(() => {
-    const initial: Message[] = briefText ? [{ role: 'assistant', content: briefText }] : []
-    fetch('/api/advisor/chat')
-      .then(r => r.json())
-      .then(({ messages: history }) => {
-        // Don't show history if the brief is already the first message there
-        const dedupedHistory = (history ?? []).filter(
-          (m: Message) => !(m.role === 'assistant' && m.content === briefText)
-        )
-        setMessages([...initial, ...dedupedHistory])
-      })
-      .catch(() => setMessages(initial))
-  }, [briefText])
+    let cancelled = false
+
+    async function load() {
+      let history: Message[] = []
+      try {
+        const res = await fetch('/api/advisor/chat')
+        const data = await res.json()
+        history = data.messages ?? []
+      } catch { /* show empty history; the brief may still arrive */ }
+      if (cancelled) return
+      setMessages(history)
+      setHistoryLoaded(true)
+
+      let briefText = ''
+      try {
+        const res = await fetch('/api/advisor/brief')
+        // 204 = the advisor has nothing new to say; just resume the conversation.
+        if (res.status === 204 || !res.ok || !res.body) return
+        if (cancelled) return
+
+        setStreaming(true)
+        setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          if (cancelled) return
+          briefText += decoder.decode(value, { stream: true })
+          setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: briefText }])
+        }
+        // Stream produced nothing — drop the empty placeholder bubble.
+        if (!briefText) setMessages(prev => prev.slice(0, -1))
+      } catch {
+        if (cancelled) return
+        if (briefText) return // partial brief already rendered; leave it
+        setMessages(prev => {
+          const withoutPlaceholder =
+            prev[prev.length - 1]?.role === 'assistant' && prev[prev.length - 1]?.content === ''
+              ? prev.slice(0, -1)
+              : prev
+          return withoutPlaceholder.length === 0
+            ? [{ role: 'assistant', content: "Hey! What's on your mind?" }]
+            : withoutPlaceholder
+        })
+      } finally {
+        if (!cancelled) setStreaming(false)
+      }
+    }
+
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     // Instant during streaming so each token doesn't restart a smooth-scroll
@@ -229,6 +268,17 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
     <div className="flex flex-col h-full">
       {/* Message list */}
       <div className="flex-1 overflow-y-auto space-y-3 pb-4">
+        {!historyLoaded && messages.length === 0 && (
+          <div className="flex justify-start">
+            <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-zinc-900 border border-zinc-800">
+              <div className="flex gap-1 items-center py-1">
+                <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
         {messages.map((m, i) => (
           <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
@@ -327,8 +377,7 @@ export default function AdvisorChat({ briefText }: AdvisorChatProps) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
           }}
           placeholder="Message your advisor..."
-          disabled={streaming}
-          className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500 rounded-2xl px-4 py-3 text-base outline-none resize-none disabled:opacity-40 leading-normal"
+          className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500 rounded-2xl px-4 py-3 text-base outline-none resize-none leading-normal"
           style={{ minHeight: '48px', maxHeight: '140px' }}
         />
         <button

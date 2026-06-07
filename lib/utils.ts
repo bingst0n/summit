@@ -23,6 +23,17 @@ export function today(): string {
   return localDate(0)
 }
 
+/** The current hour (0–23) in America/New_York. h23 keeps midnight at 0, not 24. */
+export function etHour(date: Date = new Date()): number {
+  return Number(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: TZ,
+      hour: 'numeric',
+      hourCycle: 'h23',
+    }).format(date)
+  )
+}
+
 export function daysUntil(dateStr: string): number {
   const ms = Date.parse(dateStr + 'T00:00:00Z') - Date.parse(today() + 'T00:00:00Z')
   return Math.round(ms / 86_400_000)

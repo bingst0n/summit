@@ -13,6 +13,8 @@ import {
   upsertConversationState,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
+import { toApiMessages } from '@/lib/conversation'
+import type { ChatMessage } from '@/lib/types'
 
 export const maxDuration = 60
 
@@ -40,6 +42,12 @@ export async function POST(req: Request) {
   }
 
   const date = today()
+  const time = new Date().toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/New_York',
+  })
   const horizonStr = localDate(30)
 
   const [goals, todayTasks, recentLogs, lightDays, state] = await Promise.all([
@@ -74,6 +82,7 @@ export async function POST(req: Request) {
 
   const systemPrompt = ADVISOR_SYSTEM({
     date,
+    time,
     goals: goalsSummary,
     todayTasks: tasksSummary,
     recentLogs: logsSummary,
@@ -81,11 +90,7 @@ export async function POST(req: Request) {
     summary: state.summary,
   })
 
-  const historyMessages = state.recent_messages.slice(-10)
-  const messagesForApi = [
-    ...historyMessages,
-    { role: 'user' as const, content: message },
-  ]
+  const messagesForApi = toApiMessages(state.recent_messages, message)
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-6',
@@ -120,17 +125,22 @@ export async function POST(req: Request) {
         if (!fullResponse) return
 
         // Persist whatever streamed (even a partial response) so the turn
-        // isn't lost if the stream errored midway.
+        // isn't lost if the stream errored midway. Re-read state right before
+        // writing: generation took seconds, and the brief route may have
+        // appended in the meantime — persisting from the pre-stream snapshot
+        // would silently clobber it.
         try {
-          const updatedMessages = [
-            ...state.recent_messages,
-            { role: 'user' as const, content: message },
-            { role: 'assistant' as const, content: fullResponse },
+          const fresh = await getConversationState()
+          const ts = new Date().toISOString()
+          const updatedMessages: ChatMessage[] = [
+            ...fresh.recent_messages,
+            { role: 'user', content: message, ts },
+            { role: 'assistant', content: fullResponse, ts },
           ]
 
           if (updatedMessages.length <= 20) {
             await upsertConversationState({
-              summary: state.summary,
+              summary: fresh.summary,
               recent_messages: updatedMessages,
             })
             return
@@ -156,8 +166,8 @@ export async function POST(req: Request) {
                 ? compressionMsg.content[0].text
                 : ''
 
-            const combinedSummary = state.summary
-              ? `${state.summary}\n\n${newSummaryChunk}`
+            const combinedSummary = fresh.summary
+              ? `${fresh.summary}\n\n${newSummaryChunk}`
               : newSummaryChunk
 
             await upsertConversationState({
@@ -167,7 +177,7 @@ export async function POST(req: Request) {
           } catch {
             // Compression failed — save without compressing
             await upsertConversationState({
-              summary: state.summary,
+              summary: fresh.summary,
               recent_messages: updatedMessages.slice(-20),
             })
           }

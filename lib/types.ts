@@ -34,9 +34,18 @@ export interface CalendarMark {
   created_at: string
 }
 
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+  /** Set on proactive daily briefs so the brief route can rate-limit itself. */
+  kind?: 'brief'
+  /** ISO timestamp. Absent on messages persisted before timestamps existed. */
+  ts?: string
+}
+
 export interface ConversationState {
   id: number
   summary: string
-  recent_messages: Array<{ role: 'user' | 'assistant'; content: string }>
+  recent_messages: ChatMessage[]
   updated_at: string
 }
