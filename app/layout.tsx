@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from 'next'
-import { Geist } from 'next/font/google'
+import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import TabBar from '@/components/TabBar'
 import SideNav from '@/components/SideNav'
 import ServiceWorkerRegistrar from '@/components/ServiceWorkerRegistrar'
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
+const grotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-grotesk' })
+const jbmono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-jbmono' })
 
 export const viewport: Viewport = {
-  themeColor: '#09090b',
+  themeColor: '#0c1320',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -32,8 +33,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={geist.variable}>
-      <body className="bg-zinc-950 text-zinc-50 min-h-screen font-sans antialiased">
+    <html lang="en" className={`${grotesk.variable} ${jbmono.variable}`}>
+      <body className="bg-bg text-fg min-h-screen font-sans antialiased">
         <SideNav />
         {/* Mobile: narrow column + bottom tab bar clearance (pb-24).
             Desktop (md+): clear the fixed w-60 sidebar and widen the content. */}

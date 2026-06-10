@@ -57,7 +57,7 @@ export default function CalendarGrid({
     <div>
       <div className="grid grid-cols-7 mb-1">
         {dayLabels.map(d => (
-          <div key={d} className="text-center text-xs text-zinc-600 py-1">{d}</div>
+          <div key={d} className="text-center font-mono text-[10px] tracking-[0.1em] text-mut/70 py-1">{d}</div>
         ))}
       </div>
       <div className="grid grid-cols-7 gap-y-1">
@@ -78,27 +78,27 @@ export default function CalendarGrid({
               aria-pressed={selectMode ? isPicked : undefined}
               className={`relative flex flex-col items-center py-2 md:py-3 rounded-lg transition-colors ${
                 isPicked
-                  ? 'bg-indigo-500/25 ring-2 ring-indigo-400'
+                  ? 'bg-ice/15 ring-2 ring-ice'
                   : isSelected
-                  ? 'bg-indigo-600'
+                  ? 'bg-ember'
                   : isLight
-                  ? 'bg-amber-950/40 hover:bg-amber-950/60'
-                  : 'hover:bg-zinc-800/60 active:bg-zinc-800'
+                  ? 'bg-warn/10 hover:bg-warn/15'
+                  : 'hover:bg-panel2/70 active:bg-panel2'
               }`}
             >
               <span
                 className={`text-sm font-medium leading-none ${
                   isSelected
-                    ? 'text-white'
+                    ? 'text-ember-ink font-bold'
                     : isToday
-                    ? 'text-indigo-400'
-                    : 'text-zinc-300'
+                    ? 'text-ember'
+                    : 'text-fg/80'
                 }`}
               >
                 {day}
               </span>
               {isLight && !isSelected && (
-                <span className="text-[8px] text-amber-600 leading-none mt-0.5">light</span>
+                <span className="text-[8px] font-mono text-warn leading-none mt-0.5">light</span>
               )}
               {colors.length > 0 && (
                 <div className="flex gap-0.5 mt-1">

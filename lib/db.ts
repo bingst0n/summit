@@ -122,6 +122,14 @@ export async function replaceFutureTasks(
   }
 }
 
+/** Slim columns for computing per-goal progress + drift on the dashboard. */
+export async function getTaskStats(): Promise<Array<Pick<DailyTask, 'goal_id' | 'date' | 'completed'>>> {
+  const { data } = await db()
+    .from('daily_tasks')
+    .select('goal_id, date, completed')
+  return data ?? []
+}
+
 export async function getLogsForDate(date: string): Promise<DailyLog[]> {
   const { data } = await db().from('daily_logs').select('*').eq('date', date)
   return data ?? []

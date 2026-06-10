@@ -1,20 +1,41 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
+/* ── Expedition palette ─────────────────────────────────────────────
+   Registered as Tailwind theme colors, so bg-panel / text-mut /
+   border-line / text-ember etc. work as utilities everywhere. */
+@theme {
+  --color-bg: #0c1320;
+  --color-panel: #121c2e;
+  --color-panel2: #1a2638;
+  --color-line: #1d2c44;
+  --color-fg: #e8eef7;
+  --color-mut: #7c8aa0;
+  --color-ember: #ff7847;
+  --color-ember2: #ffb347;
+  --color-ember-ink: #2a1006;
+  --color-ice: #9ecfff;
+  --color-moss: #79d49a;
+  --color-moss-ink: #06250f;
+  --color-warn: #ffc46b;
+  --color-warn-ink: #2a1c06;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-grotesk);
+  --font-mono: var(--font-jbmono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background-color: var(--color-bg);
+  color: var(--color-fg);
+  /* Topographic contour rings, radiating from off-canvas top-right. */
+  background-image: repeating-radial-gradient(
+    circle at 110% -20%,
+    transparent 0 46px,
+    rgba(158, 207, 255, 0.045) 46px 47px
+  );
+  background-attachment: fixed;
 }
 
 @layer utilities {
@@ -24,6 +45,27 @@ body {
   .pb-safe {
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.5rem);
   }
+}
+
+/* Glowing gradient progress edge along a card's bottom (Night Focus). */
+.glow-edge {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-ember), var(--color-ember2));
+  border-radius: 99px;
+}
+.glow-edge::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  filter: blur(6px);
+  background: inherit;
+  opacity: 0.8;
+}
+.glow-edge.moss {
+  background: var(--color-moss);
 }
 
 /* Motion: page transitions + bottom sheet */
@@ -63,7 +105,7 @@ body {
   }
 }
 
-/* Floating action bar: sits above the tab bar on mobile, near the bottom
+/* Floating bars: sit above the tab bar on mobile, near the bottom
    edge on desktop where there is no tab bar. */
 .above-tabbar {
   bottom: calc(66px + max(env(safe-area-inset-bottom, 0px), 0.5rem));

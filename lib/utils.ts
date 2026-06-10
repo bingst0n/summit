@@ -1,6 +1,63 @@
-export const SUMMER_END = '2026-08-31'
+/**
+ * The active tracking season. Day 1 = `start`, the summit = `end`.
+ * When a new season begins (e.g. the school year), swap this one object —
+ * the day counter, elevation graph, percent climbed, and default goal
+ * deadlines all derive from it.
+ */
+export const SEASON = {
+  name: 'Summer',
+  start: '2026-06-15',
+  end: '2026-08-31',
+}
 
 const TZ = 'America/New_York'
+
+/** Whole-day difference between two YYYY-MM-DD strings (b - a). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86_400_000)
+}
+
+/** Pure calendar arithmetic on a YYYY-MM-DD string (DST-safe). */
+export function addDays(dateStr: string, n: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d))
+  dt.setUTCDate(dt.getUTCDate() + n)
+  return dt.toISOString().split('T')[0]
+}
+
+/** Total days in the season, inclusive of both endpoints. */
+export function seasonLength(): number {
+  return daysBetween(SEASON.start, SEASON.end) + 1
+}
+
+/**
+ * Which day of the season a date is (start = day 1), clamped to
+ * [0, seasonLength()] — 0 means the season hasn't started yet.
+ */
+export function seasonDay(dateStr: string): number {
+  return Math.min(Math.max(daysBetween(SEASON.start, dateStr) + 1, 0), seasonLength())
+}
+
+/** Fraction of the season elapsed, 0..1. */
+export function seasonProgress(dateStr: string): number {
+  return seasonDay(dateStr) / seasonLength()
+}
+
+/**
+ * Consecutive days with a check-in, counting back from today — or from
+ * yesterday if today isn't logged yet (the streak isn't broken until a full
+ * day is missed).
+ */
+export function logStreak(logDates: Iterable<string>, todayStr: string): number {
+  const days = new Set(logDates)
+  let cursor = days.has(todayStr) ? todayStr : addDays(todayStr, -1)
+  let n = 0
+  while (days.has(cursor)) {
+    n++
+    cursor = addDays(cursor, -1)
+  }
+  return n
+}
 
 /**
  * The calendar date in America/New_York as `YYYY-MM-DD`, optionally offset by a
@@ -12,11 +69,7 @@ const TZ = 'America/New_York'
 export function localDate(offsetDays = 0, base: Date = new Date()): string {
   const etToday = new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(base)
   if (offsetDays === 0) return etToday
-  // Pure calendar arithmetic on the ET date (DST-safe — no instant math).
-  const [y, m, d] = etToday.split('-').map(Number)
-  const dt = new Date(Date.UTC(y, m - 1, d))
-  dt.setUTCDate(dt.getUTCDate() + offsetDays)
-  return dt.toISOString().split('T')[0]
+  return addDays(etToday, offsetDays)
 }
 
 export function today(): string {

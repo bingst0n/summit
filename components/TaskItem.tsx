@@ -5,10 +5,16 @@ import type { DailyTask, Goal } from '@/lib/types'
 interface TaskItemProps {
   task: DailyTask
   goal: Goal
+  /** Larger "NOW" card treatment. */
+  big?: boolean
+  /** 0–100: renders a glowing progress edge along the card bottom. */
+  edgePct?: number
+  /** Extra row (e.g. status chips) under the meta line. */
+  footer?: React.ReactNode
   onToggle?: (id: string, completed: boolean) => void
 }
 
-export default function TaskItem({ task, goal, onToggle }: TaskItemProps) {
+export default function TaskItem({ task, goal, big = false, edgePct, footer, onToggle }: TaskItemProps) {
   const [completed, setCompleted] = useState(task.completed)
   const [serverValue, setServerValue] = useState(task.completed)
   const [pending, setPending] = useState(false)
@@ -41,40 +47,48 @@ export default function TaskItem({ task, goal, onToggle }: TaskItemProps) {
 
   return (
     <div
-      className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
-        completed ? 'border-zinc-800/50 bg-zinc-900/50' : 'border-zinc-800 bg-zinc-900'
-      }`}
+      className={`relative overflow-hidden flex items-start gap-3 rounded-2xl border transition-colors ${
+        big ? 'p-4' : 'p-3'
+      } ${completed ? 'border-line/50 bg-panel/50' : 'border-line bg-panel'}`}
     >
       <button
         onClick={handleToggle}
         disabled={pending}
         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
           completed
-            ? 'border-transparent'
-            : 'border-zinc-600 hover:border-zinc-400'
+            ? 'bg-ember border-ember'
+            : 'border-[#3a587f] hover:border-ice'
         }`}
-        style={completed ? { backgroundColor: goal.color } : {}}
         aria-label={completed ? 'Mark incomplete' : 'Mark complete'}
       >
         {completed && (
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#2a1006" strokeWidth="3.5">
             <path d="M20 6L9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         )}
       </button>
 
       <div className="flex-1 min-w-0">
-        <p className={`text-sm leading-relaxed ${completed ? 'line-through text-zinc-500' : 'text-zinc-200'}`}>
+        <p
+          className={`leading-snug ${big ? 'text-[17px] font-bold' : 'text-sm font-medium'} ${
+            completed ? 'line-through text-mut' : 'text-fg'
+          }`}
+        >
           {task.description}
         </p>
-        <div className="flex items-center gap-1.5 mt-1">
+        <div className="flex items-center gap-1.5 mt-1.5">
           <span
             className="inline-block w-2 h-2 rounded-full"
             style={{ backgroundColor: goal.color }}
           />
-          <span className="text-xs text-zinc-500">{goal.title}</span>
+          <span className="font-mono text-[10.5px] tracking-[0.08em] text-mut uppercase">{goal.title}</span>
         </div>
+        {footer}
       </div>
+
+      {edgePct !== undefined && (
+        <span className="glow-edge" style={{ width: `${Math.min(Math.max(edgePct, 0), 100)}%` }} />
+      )}
     </div>
   )
 }

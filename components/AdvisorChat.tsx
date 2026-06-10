@@ -251,11 +251,11 @@ export default function AdvisorChat() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60dvh] px-8 gap-6">
         <div className="w-full max-w-xs text-center">
-          <p className="text-zinc-300 font-semibold mb-1">{label}</p>
-          <p className="text-zinc-600 text-sm mb-6">This takes about 20 seconds</p>
-          <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+          <p className="text-fg font-semibold mb-1">{label}</p>
+          <p className="text-mut text-sm mb-6">This takes about 20 seconds</p>
+          <div className="h-1.5 bg-line rounded-full overflow-hidden">
             <div
-              className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out"
+              className="h-full bg-gradient-to-r from-ember to-ember2 rounded-full transition-all duration-500 ease-out"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -270,11 +270,11 @@ export default function AdvisorChat() {
       <div className="flex-1 overflow-y-auto space-y-3 pb-4">
         {!historyLoaded && messages.length === 0 && (
           <div className="flex justify-start">
-            <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-zinc-900 border border-zinc-800">
+            <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-panel border border-line">
               <div className="flex gap-1 items-center py-1">
-                <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-2 h-2 bg-mut rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-mut rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-mut rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -284,17 +284,17 @@ export default function AdvisorChat() {
             <div
               className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                 m.role === 'user'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-zinc-900 border border-zinc-800 text-zinc-100'
+                  ? 'bg-ember text-ember-ink font-medium'
+                  : 'bg-panel border border-line text-fg'
               }`}
             >
               {m.role === 'assistant' ? (
                 <div className="prose prose-sm prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0">
                   {streaming && i === messages.length - 1 && !m.content ? (
                     <div className="flex gap-1 items-center py-1">
-                      <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-2 h-2 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                      <span className="w-2 h-2 bg-mut rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 bg-mut rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 bg-mut rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
                   ) : (
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -302,7 +302,7 @@ export default function AdvisorChat() {
                     </ReactMarkdown>
                   )}
                   {streaming && i === messages.length - 1 && m.content && (
-                    <span className="inline-block w-1 h-4 bg-zinc-400 ml-0.5 animate-pulse align-middle" />
+                    <span className="inline-block w-1 h-4 bg-mut ml-0.5 animate-pulse align-middle" />
                   )}
                 </div>
               ) : (
@@ -315,10 +315,10 @@ export default function AdvisorChat() {
         {/* Save goal button */}
         {pendingGoalData && !streaming && (
           <div className="flex flex-col items-center gap-2 pt-2">
-            {saveError && <p className="text-red-400 text-xs text-center">{saveError}</p>}
+            {saveError && <p className="text-warn text-xs text-center">{saveError}</p>}
             <button
               onClick={saveGoal}
-              className="bg-green-600 hover:bg-green-700 active:bg-green-700 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
+              className="bg-moss hover:brightness-110 active:brightness-90 text-moss-ink font-semibold px-8 py-3 rounded-2xl transition-colors"
             >
               {saveError ? 'Retry' : 'Save Goal ✓'}
             </button>
@@ -330,7 +330,7 @@ export default function AdvisorChat() {
           <div className="flex flex-col items-center gap-2 pt-2">
             <button
               onClick={deleteGoal}
-              className="bg-red-600 hover:bg-red-700 active:bg-red-700 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
+              className="bg-[#e5484d] hover:brightness-110 active:brightness-90 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
             >
               Delete &quot;{pendingDeleteGoal.title}&quot;
             </button>
@@ -343,22 +343,22 @@ export default function AdvisorChat() {
       {scheduleStatus !== 'idle' && (
         <div className="shrink-0 px-1 pb-2 text-xs">
           {scheduleStatus === 'updating' && (
-            <span className="text-zinc-500 flex items-center gap-2">
+            <span className="text-mut flex items-center gap-2 font-mono text-[11px]">
               <span className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-zinc-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-1.5 h-1.5 bg-mut rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 bg-mut rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 bg-mut rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </span>
               Updating your schedule…
             </span>
           )}
           {scheduleStatus === 'updated' && (
-            <span className="text-green-500">Schedule updated ✓</span>
+            <span className="text-moss font-mono text-[11px]">Schedule updated ✓</span>
           )}
           {scheduleStatus === 'error' && (
             <button
               onClick={() => lastCheckInRef.current && runCheckIn(lastCheckInRef.current)}
-              className="text-red-400 active:text-red-300"
+              className="text-warn active:text-ember font-mono text-[11px]"
             >
               Couldn&apos;t update schedule · Retry
             </button>
@@ -367,7 +367,7 @@ export default function AdvisorChat() {
       )}
 
       {/* Input */}
-      <div className="shrink-0 pt-2 flex gap-2 border-t border-zinc-800">
+      <div className="shrink-0 pt-2 flex gap-2 border-t border-line">
         <textarea
           ref={textareaRef}
           value={input}
@@ -377,13 +377,13 @@ export default function AdvisorChat() {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
           }}
           placeholder="Message your advisor..."
-          className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-indigo-500 rounded-2xl px-4 py-3 text-base outline-none resize-none leading-normal"
+          className="flex-1 bg-panel border border-line focus:border-ember rounded-2xl px-4 py-3 text-base outline-none resize-none leading-normal"
           style={{ minHeight: '48px', maxHeight: '140px' }}
         />
         <button
           onClick={sendMessage}
           disabled={streaming || !input.trim()}
-          className="bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-600 text-white font-semibold px-5 rounded-2xl disabled:opacity-40 self-end transition-colors"
+          className="bg-ember hover:bg-ember2 active:bg-ember2 text-ember-ink font-bold px-5 rounded-2xl disabled:opacity-40 self-end transition-colors"
           style={{ height: '48px' }}
         >
           Send

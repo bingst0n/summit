@@ -8,7 +8,7 @@ export default function TabBar() {
   const pathname = usePathname()
 
   return (
-    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-zinc-900/95 backdrop-blur border-t border-zinc-800">
+    <nav className="md:hidden fixed bottom-0 inset-x-0 bg-bg/95 backdrop-blur border-t border-line">
       <div className="max-w-lg mx-auto flex pb-safe">
         {NAV_ITEMS.map(tab => {
           const active = pathname === tab.href
@@ -16,8 +16,8 @@ export default function TabBar() {
             <Link
               key={tab.href}
               href={tab.href}
-              className={`flex-1 flex flex-col items-center py-3 gap-1 text-xs font-medium transition-colors ${
-                active ? 'text-indigo-400' : 'text-zinc-500'
+              className={`flex-1 flex flex-col items-center py-3 gap-1 font-mono text-[10px] tracking-[0.14em] transition-colors ${
+                active ? 'text-ember' : 'text-mut/70'
               }`}
             >
               {tab.icon(active)}

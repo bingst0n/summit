@@ -26,16 +26,16 @@ export default async function HistoryPage() {
   return (
     <div className="px-4 pt-safe pb-safe">
       <div className="py-6">
-        <h1 className="text-3xl font-bold tracking-tight">History</h1>
-        <p className="text-zinc-500 text-sm mt-1">Your check-in log</p>
+        <p className="font-mono text-[11px] tracking-[0.18em] text-mut">📓 LOGBOOK</p>
+        <h1 className="text-3xl font-bold tracking-tight mt-1">History</h1>
       </div>
 
       {days.length === 0 ? (
-        <div className="bg-zinc-900 rounded-2xl p-8 text-center border border-zinc-800">
-          <p className="text-zinc-400 text-sm mb-4">No check-ins yet.</p>
+        <div className="bg-panel rounded-2xl p-8 text-center border border-line">
+          <p className="text-mut text-sm mb-4">Nothing in the logbook yet.</p>
           <Link
             href="/advisor"
-            className="inline-block bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
+            className="inline-block bg-ember hover:bg-ember2 text-ember-ink text-sm font-bold px-5 py-2.5 rounded-xl transition-colors"
           >
             Open Advisor
           </Link>
@@ -44,7 +44,7 @@ export default async function HistoryPage() {
         <div className="space-y-6">
           {days.map(({ date, logs }) => (
             <div key={date}>
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-widest mb-2">
+              <p className="font-mono text-[10.5px] font-semibold text-mut uppercase tracking-[0.14em] mb-2">
                 {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
                   weekday: 'long',
                   month: 'long',
@@ -55,15 +55,15 @@ export default async function HistoryPage() {
                 {logs.map(({ log, goal }) => (
                   <div
                     key={log.id}
-                    className="bg-zinc-900 rounded-2xl p-4 border border-zinc-800"
+                    className="bg-panel rounded-2xl p-4 border border-line"
                   >
                     {goal && (
-                      <p className="text-xs font-semibold text-indigo-400 mb-1.5">{goal.title}</p>
+                      <p className="font-mono text-[10.5px] tracking-[0.08em] text-ice uppercase mb-1.5">{goal.title}</p>
                     )}
                     {log.notes ? (
-                      <p className="text-sm text-zinc-300 leading-relaxed">{log.notes}</p>
+                      <p className="text-sm text-fg/85 leading-relaxed">{log.notes}</p>
                     ) : (
-                      <p className="text-sm text-zinc-600 italic">No notes</p>
+                      <p className="text-sm text-mut/70 italic">No notes</p>
                     )}
                   </div>
                 ))}

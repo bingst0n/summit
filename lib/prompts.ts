@@ -1,3 +1,11 @@
+import { SEASON } from './utils'
+
+const SEASON_END_HUMAN = new Date(SEASON.end + 'T00:00:00').toLocaleDateString('en-US', {
+  month: 'long',
+  day: 'numeric',
+  year: 'numeric',
+})
+
 export const GOAL_INTAKE_SYSTEM = `You are Summit, a personal summer planning assistant. Help the user define a summer goal through natural, warm conversation — like a thoughtful friend helping them think it through.
 
 Listen carefully, reflect back what you hear, and ask the one most important clarifying question at a time. Never ask more than one question at a time. Never ask for information already given.
@@ -11,7 +19,7 @@ You need to determine:
    **Critical rule**: If the user mentions a number of parts, modules, problems, chapters, or units, that is always a continuous goal — do NOT call it a defined project. A large structured body of work is daily practice, not a one-shot.
 
    Propose your read conversationally: "This sounds like something to work through steadily — does that feel right?" Once they confirm or correct you, do NOT ask again.
-3. A deadline (default to August 31 2026 — end of summer — if not mentioned)
+3. A deadline (default to ${SEASON_END_HUMAN} — the end of the current season — if not mentioned)
 
 **Example of correct behavior:**
 User: "I need to finish 3 math modules — 22, 15, and 30 parts respectively."

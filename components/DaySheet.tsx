@@ -60,22 +60,22 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
       {/* Sheet on mobile; centered modal on desktop (day-sheet swaps the
           slide-up animation for a fade at md+ so the centering transform
           isn't fought by the keyframe). */}
-      <div className="day-sheet fixed z-50 bg-zinc-900 overflow-y-auto bottom-0 inset-x-0 border-t border-zinc-800 rounded-t-2xl max-h-[70vh] md:bottom-auto md:inset-x-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[26rem] md:max-w-[calc(100vw-2rem)] md:max-h-[80vh] md:rounded-2xl md:border md:border-zinc-800 md:shadow-2xl">
+      <div className="day-sheet fixed z-50 bg-panel overflow-y-auto bottom-0 inset-x-0 border-t border-line rounded-t-2xl max-h-[70vh] md:bottom-auto md:inset-x-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[26rem] md:max-w-[calc(100vw-2rem)] md:max-h-[80vh] md:rounded-2xl md:border md:border-line md:shadow-2xl">
         <div className="max-w-lg mx-auto px-4 pt-4 pb-[env(safe-area-inset-bottom,24px)] md:px-5 md:pb-5">
           {/* Handle (mobile affordance only) */}
-          <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4 md:hidden" />
+          <div className="w-10 h-1 bg-line rounded-full mx-auto mb-4 md:hidden" />
 
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-base">{formatDateHeader(date)}</h2>
-            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-sm">Done</button>
+            <button onClick={onClose} className="text-mut hover:text-fg font-mono text-[11.5px] tracking-[0.06em]">Done</button>
           </div>
 
           {/* Light-day toggle */}
-          <div className="flex items-center justify-between py-3 border-b border-zinc-800 mb-4">
+          <div className="flex items-center justify-between py-3 border-b border-line mb-4">
             <div>
-              <p className="text-sm font-medium text-zinc-200">Light day</p>
-              <p className="text-xs text-zinc-500 mt-0.5">Fewer tasks scheduled by the advisor</p>
+              <p className="text-sm font-bold text-fg">Light day</p>
+              <p className="text-xs text-mut mt-0.5">Fewer tasks scheduled by the advisor</p>
             </div>
             <button
               onClick={handleLightToggle}
@@ -84,7 +84,7 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
               aria-checked={isLight}
               aria-label="Light day"
               className={`w-12 h-6 rounded-full transition-colors relative ${
-                isLight ? 'bg-amber-500' : 'bg-zinc-700'
+                isLight ? 'bg-warn' : 'bg-panel2'
               }`}
             >
               {/* left-0.5 is load-bearing: without an explicit horizontal anchor,
@@ -101,7 +101,7 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
 
           {/* Tasks */}
           {tasks.length === 0 ? (
-            <p className="text-zinc-500 text-sm text-center py-4">No tasks scheduled</p>
+            <p className="text-mut text-sm text-center py-4">No waypoints scheduled</p>
           ) : (
             <div className="space-y-2">
               {tasks.map(task => {
@@ -110,11 +110,11 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
                   <div key={task.id} className="flex items-start gap-3 py-2">
                     <span
                       className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                      style={{ backgroundColor: goal?.color ?? '#6366f1' }}
+                      style={{ backgroundColor: goal?.color ?? '#ff7847' }}
                     />
                     <div>
-                      <p className="text-sm text-zinc-200">{task.description}</p>
-                      {goal && <p className="text-xs text-zinc-500 mt-0.5">{goal.title}</p>}
+                      <p className="text-sm text-fg/90">{task.description}</p>
+                      {goal && <p className="font-mono text-[10px] tracking-[0.08em] text-mut mt-1 uppercase">{goal.title}</p>}
                     </div>
                   </div>
                 )

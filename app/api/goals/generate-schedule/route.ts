@@ -6,7 +6,9 @@ import { today as etToday, localDate } from '@/lib/utils'
 
 export const maxDuration = 60
 
-const GOAL_COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9']
+// Expedition palette: ember, ice, moss, warn, violet, rose — readable as dots
+// and progress bars against the ink-blue panels.
+const GOAL_COLORS = ['#ff7847', '#9ecfff', '#79d49a', '#ffc46b', '#c792ea', '#f47fa4']
 
 function extractJsonArray(text: string): string {
   const trimmed = text.trim()
