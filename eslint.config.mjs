@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Claude Code worktrees — stale copies of the repo, not part of the app.
+    ".claude/**",
+    // Plain-JS service worker (no React/TS rules apply).
+    "public/sw.js",
   ]),
 ]);
 

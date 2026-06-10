@@ -57,16 +57,18 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
         onClick={onClose}
       />
 
-      {/* Sheet */}
-      <div className="fixed bottom-0 inset-x-0 z-50 bg-zinc-900 border-t border-zinc-800 rounded-t-2xl max-h-[70vh] overflow-y-auto animate-sheet-up">
-        <div className="max-w-lg mx-auto px-4 pt-4 pb-[env(safe-area-inset-bottom,24px)]">
-          {/* Handle */}
-          <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4" />
+      {/* Sheet on mobile; centered modal on desktop (day-sheet swaps the
+          slide-up animation for a fade at md+ so the centering transform
+          isn't fought by the keyframe). */}
+      <div className="day-sheet fixed z-50 bg-zinc-900 overflow-y-auto bottom-0 inset-x-0 border-t border-zinc-800 rounded-t-2xl max-h-[70vh] md:bottom-auto md:inset-x-auto md:left-1/2 md:top-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[26rem] md:max-w-[calc(100vw-2rem)] md:max-h-[80vh] md:rounded-2xl md:border md:border-zinc-800 md:shadow-2xl">
+        <div className="max-w-lg mx-auto px-4 pt-4 pb-[env(safe-area-inset-bottom,24px)] md:px-5 md:pb-5">
+          {/* Handle (mobile affordance only) */}
+          <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mb-4 md:hidden" />
 
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-base">{formatDateHeader(date)}</h2>
-            <button onClick={onClose} className="text-zinc-500 text-sm">Done</button>
+            <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-sm">Done</button>
           </div>
 
           {/* Light-day toggle */}

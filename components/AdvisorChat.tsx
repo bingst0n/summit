@@ -318,7 +318,7 @@ export default function AdvisorChat() {
             {saveError && <p className="text-red-400 text-xs text-center">{saveError}</p>}
             <button
               onClick={saveGoal}
-              className="bg-green-600 active:bg-green-700 text-white font-semibold px-8 py-3 rounded-2xl"
+              className="bg-green-600 hover:bg-green-700 active:bg-green-700 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
             >
               {saveError ? 'Retry' : 'Save Goal ✓'}
             </button>
@@ -330,7 +330,7 @@ export default function AdvisorChat() {
           <div className="flex flex-col items-center gap-2 pt-2">
             <button
               onClick={deleteGoal}
-              className="bg-red-600 active:bg-red-700 text-white font-semibold px-8 py-3 rounded-2xl"
+              className="bg-red-600 hover:bg-red-700 active:bg-red-700 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
             >
               Delete &quot;{pendingDeleteGoal.title}&quot;
             </button>
@@ -383,7 +383,7 @@ export default function AdvisorChat() {
         <button
           onClick={sendMessage}
           disabled={streaming || !input.trim()}
-          className="bg-indigo-500 active:bg-indigo-600 text-white font-semibold px-5 rounded-2xl disabled:opacity-40 self-end"
+          className="bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-600 text-white font-semibold px-5 rounded-2xl disabled:opacity-40 self-end transition-colors"
           style={{ height: '48px' }}
         >
           Send

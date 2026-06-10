@@ -151,7 +151,7 @@ export default function CalendarPageClient({
   return (
     <div className="px-4 pt-safe pb-4">
       <div className="py-6 flex items-center justify-between">
-        <button onClick={prevMonth} className="text-zinc-400 p-1 active:text-zinc-200">
+        <button onClick={prevMonth} className="text-zinc-400 p-1 hover:text-zinc-200 active:text-zinc-200">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -159,7 +159,7 @@ export default function CalendarPageClient({
         <h1 className={`text-lg font-semibold transition-opacity ${loading ? 'opacity-50' : ''}`}>
           {monthLabel}
         </h1>
-        <button onClick={nextMonth} className="text-zinc-400 p-1 active:text-zinc-200">
+        <button onClick={nextMonth} className="text-zinc-400 p-1 hover:text-zinc-200 active:text-zinc-200">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
@@ -173,7 +173,7 @@ export default function CalendarPageClient({
         </span>
         <button
           onClick={selectMode ? exitSelectMode : enterSelectMode}
-          className="text-sm font-medium text-indigo-400 active:text-indigo-300 py-1 px-1"
+          className="text-sm font-medium text-indigo-400 hover:text-indigo-300 active:text-indigo-300 py-1 px-1"
         >
           {selectMode ? 'Cancel' : 'Select'}
         </button>
@@ -202,13 +202,11 @@ export default function CalendarPageClient({
         />
       )}
 
-      {/* Bulk action bar — floats above the TabBar while selecting */}
+      {/* Bulk action bar — floats above the TabBar on mobile, above the
+          bottom edge (offset past the sidebar) on desktop */}
       {selectMode && pickedDays.size > 0 && (
-        <div
-          className="fixed inset-x-0 z-30 animate-sheet-up"
-          style={{ bottom: 'calc(66px + max(env(safe-area-inset-bottom, 0px), 0.5rem))' }}
-        >
-          <div className="max-w-lg mx-auto px-4 pb-2">
+        <div className="fixed inset-x-0 z-30 animate-sheet-up above-tabbar md:left-60">
+          <div className="max-w-lg mx-auto px-4 pb-2 md:max-w-3xl">
             <div className="flex items-center justify-between bg-zinc-900/95 backdrop-blur border border-zinc-800 rounded-2xl px-4 py-3 shadow-lg">
               <span className="text-sm text-zinc-300">
                 {pickedDays.size} day{pickedDays.size !== 1 ? 's' : ''} selected
@@ -218,8 +216,8 @@ export default function CalendarPageClient({
                 disabled={applying}
                 className={`text-sm font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-50 ${
                   bulkAction === 'clear'
-                    ? 'bg-zinc-700 text-zinc-200 active:bg-zinc-600'
-                    : 'bg-amber-500 text-zinc-950 active:bg-amber-400'
+                    ? 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600 active:bg-zinc-600'
+                    : 'bg-amber-500 text-zinc-950 hover:bg-amber-400 active:bg-amber-400'
                 }`}
               >
                 {applying ? 'Saving…' : bulkAction === 'clear' ? 'Remove light' : 'Mark as light'}

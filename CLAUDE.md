@@ -44,8 +44,10 @@ pnpm lint       # ESLint
 
 ## PWA Setup
 
-- `public/manifest.json` — PWA manifest (display: standalone)
-- Service worker registered in `app/layout.tsx`
+- `app/manifest.ts` — PWA manifest (display: standalone), served at `/manifest.webmanifest`
+- `app/icon.tsx` / `app/apple-icon.tsx` — generated app icons (192px PNG / 180px apple-touch-icon)
+- `public/sw.js` — service worker (network-first; offline fallback to last cached page), registered by `components/ServiceWorkerRegistrar.tsx` in `app/layout.tsx`
+- `viewportFit: 'cover'` in `app/layout.tsx` is required for iOS safe-area insets (`pt-safe`/`pb-safe` in `globals.css`)
 - Must be served over HTTPS (Vercel handles this)
 
 ## Notifications
@@ -75,10 +77,14 @@ ANTHROPIC_API_KEY=               # Anthropic API key for Claude chat, schedule g
 
 ## Supabase Schema
 
-Three tables: `goals`, `milestones` (FK → goals, cascade delete), `daily_logs` (FK → goals, unique on date+goal_id).
+Five tables: `goals`, `daily_tasks` (FK → goals), `daily_logs` (FK → goals, unique on date+goal_id), `calendar_marks` (light days, PK on date), `conversation_state` (single row, id=1 — advisor chat history + rolling summary).
+
+## Timezone Rule
+
+All "what day is it" logic must use `today()`/`localDate()` from `lib/utils.ts` (America/New_York), never `new Date().toISOString()` — the server runs in UTC and rolls over to tomorrow at ~8 PM ET.
 
 ## Phase Status
 
-- Phase 1: complete — Supabase tables created, env vars in Vercel ✓ (note: schema will be reworked in Phase 2)
-- Phase 2 (in design): Rearchitect around LLM — conversational goal intake, continuous vs one-shot goal types, free-form log system, dynamic schedule generation and adjustment
+- Phase 1: complete — Supabase tables, env vars, cron notification ✓
+- Phase 2: complete — conversational advisor (goal intake, check-ins, deletion), schedule generation + adjustment loop, daily briefs, calendar with light days ✓
 - Phase 3: weekly summary notification, pacing warnings, heatmap

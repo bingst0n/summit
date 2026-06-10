@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/claude'
 import { SCHEDULE_GENERATION_SYSTEM } from '@/lib/prompts'
 import { createGoal, createDailyTasks, getGoals } from '@/lib/db'
+import { today as etToday, localDate } from '@/lib/utils'
 
 export const maxDuration = 60
 
@@ -42,10 +43,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ goal })
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  const horizon = new Date()
-  horizon.setDate(horizon.getDate() + 30)
-  const horizonStr = horizon.toISOString().split('T')[0]
+  // ET, not UTC — toISOString() rolls over to "tomorrow" after ~8 PM ET, which
+  // would make the generated schedule skip today.
+  const today = etToday()
+  const horizonStr = localDate(30)
   const scheduleEnd = goalData.deadline < horizonStr ? goalData.deadline : horizonStr
 
   const userPrompt = `Goal: ${goalData.title}

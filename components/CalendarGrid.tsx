@@ -76,14 +76,14 @@ export default function CalendarGrid({
               key={i}
               onClick={() => onSelectDate(dateStr)}
               aria-pressed={selectMode ? isPicked : undefined}
-              className={`relative flex flex-col items-center py-2 rounded-lg transition-colors ${
+              className={`relative flex flex-col items-center py-2 md:py-3 rounded-lg transition-colors ${
                 isPicked
                   ? 'bg-indigo-500/25 ring-2 ring-indigo-400'
                   : isSelected
                   ? 'bg-indigo-600'
                   : isLight
-                  ? 'bg-amber-950/40'
-                  : 'active:bg-zinc-800'
+                  ? 'bg-amber-950/40 hover:bg-amber-950/60'
+                  : 'hover:bg-zinc-800/60 active:bg-zinc-800'
               }`}
             >
               <span

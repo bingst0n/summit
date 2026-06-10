@@ -51,7 +51,7 @@ export default function TaskItem({ task, goal, onToggle }: TaskItemProps) {
         className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 transition-colors ${
           completed
             ? 'border-transparent'
-            : 'border-zinc-600'
+            : 'border-zinc-600 hover:border-zinc-400'
         }`}
         style={completed ? { backgroundColor: goal.color } : {}}
         aria-label={completed ? 'Mark incomplete' : 'Mark complete'}

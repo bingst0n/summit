@@ -4,6 +4,10 @@ import { getGoals, getTodayTasks, getLogsForDate, getTasksInRange } from '@/lib/
 import { today, localDate, daysUntil, SUMMER_END } from '@/lib/utils'
 import TaskItem from '@/components/TaskItem'
 
+// Without this, Next prerenders the page at build time and the dashboard
+// (today's tasks, logged-today banner, dates) is frozen until the next deploy.
+export const dynamic = 'force-dynamic'
+
 export default async function HomePage() {
   const date = today()
 
@@ -25,6 +29,7 @@ export default async function HomePage() {
     if (!upcomingTasks[task.date]) upcomingTasks[task.date] = []
     upcomingTasks[task.date].push(task)
   }
+  const hasUpcoming = upcomingDays.some(d => (upcomingTasks[d]?.length ?? 0) > 0)
 
   return (
     <div className="px-4 pt-safe">
@@ -34,7 +39,7 @@ export default async function HomePage() {
           {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' })}
         </p>
         <h1 className="text-3xl font-bold mt-1 tracking-tight">Summit</h1>
-        <p className="text-zinc-500 text-sm mt-1">{daysLeft} days left this summer</p>
+        <p className="text-zinc-500 text-sm mt-1">{Math.max(0, daysLeft)} days left this summer</p>
       </div>
 
       {/* Check-in banner */}
@@ -61,7 +66,7 @@ export default async function HomePage() {
             </div>
             <Link
               href="/advisor"
-              className="bg-indigo-500 active:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+              className="bg-indigo-500 hover:bg-indigo-600 active:bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
             >
               Log Now
             </Link>
@@ -69,44 +74,47 @@ export default async function HomePage() {
         )}
       </div>
 
-      {/* Today's tasks */}
-      {todayTasks.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-base font-semibold text-zinc-300 mb-3">Today</h2>
-          <div className="space-y-2">
-            {todayTasks.map(task => {
-              const goal = goalMap[task.goal_id]
-              if (!goal) return null
-              return <TaskItem key={task.id} task={task} goal={goal} />
-            })}
+      {/* Today + Coming up: stacked on mobile, side by side on desktop */}
+      <div className={todayTasks.length > 0 && hasUpcoming ? 'md:grid md:grid-cols-5 md:gap-8 md:items-start' : ''}>
+        {/* Today's tasks */}
+        {todayTasks.length > 0 && (
+          <div className="mb-6 md:col-span-3">
+            <h2 className="text-base font-semibold text-zinc-300 mb-3">Today</h2>
+            <div className="space-y-2">
+              {todayTasks.map(task => {
+                const goal = goalMap[task.goal_id]
+                if (!goal) return null
+                return <TaskItem key={task.id} task={task} goal={goal} />
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Coming up */}
-      {upcomingDays.some(d => (upcomingTasks[d]?.length ?? 0) > 0) && (
-        <div className="mb-6">
-          <h2 className="text-base font-semibold text-zinc-300 mb-2">Coming up</h2>
-          <div className="space-y-1">
-            {upcomingDays.map(d => {
-              const count = upcomingTasks[d]?.length ?? 0
-              if (count === 0) return null
-              return (
-                <Link
-                  key={d}
-                  href={`/calendar?date=${d}`}
-                  className="flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 active:bg-zinc-800"
-                >
-                  <span className="text-sm text-zinc-300">
-                    {new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                  </span>
-                  <span className="text-xs text-zinc-500">{count} task{count !== 1 ? 's' : ''}</span>
-                </Link>
-              )
-            })}
+        {/* Coming up */}
+        {hasUpcoming && (
+          <div className="mb-6 md:col-span-2">
+            <h2 className="text-base font-semibold text-zinc-300 mb-2">Coming up</h2>
+            <div className="space-y-1">
+              {upcomingDays.map(d => {
+                const count = upcomingTasks[d]?.length ?? 0
+                if (count === 0) return null
+                return (
+                  <Link
+                    key={d}
+                    href={`/calendar?date=${d}`}
+                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:bg-zinc-800/70 active:bg-zinc-800"
+                  >
+                    <span className="text-sm text-zinc-300">
+                      {new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    </span>
+                    <span className="text-xs text-zinc-500">{count} task{count !== 1 ? 's' : ''}</span>
+                  </Link>
+                )
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Empty state */}
       {goals.length === 0 && (
@@ -114,7 +122,7 @@ export default async function HomePage() {
           <p className="text-zinc-400 text-sm mb-4">No goals yet. Talk to the advisor to add one.</p>
           <Link
             href="/advisor"
-            className="inline-block bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+            className="inline-block bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
           >
             Open Advisor
           </Link>

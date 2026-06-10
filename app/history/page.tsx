@@ -2,6 +2,10 @@ import Link from 'next/link'
 import { getAllLogs, getGoals } from '@/lib/db'
 import type { DailyLog, Goal } from '@/lib/types'
 
+// Without this, Next prerenders the page at build time and new check-ins
+// never appear until the next deploy.
+export const dynamic = 'force-dynamic'
+
 interface DayEntry {
   date: string
   logs: Array<{ log: DailyLog; goal: Goal | undefined }>
@@ -31,7 +35,7 @@ export default async function HistoryPage() {
           <p className="text-zinc-400 text-sm mb-4">No check-ins yet.</p>
           <Link
             href="/advisor"
-            className="inline-block bg-indigo-500 text-white text-sm font-semibold px-5 py-2.5 rounded-xl"
+            className="inline-block bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl transition-colors"
           >
             Open Advisor
           </Link>
