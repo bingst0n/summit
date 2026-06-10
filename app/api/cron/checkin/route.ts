@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
-import { sendCheckinNotification } from '@/lib/pushcut'
+import { sendCheckinNotification, type ReminderSlot } from '@/lib/pushcut'
+
+const SLOTS: ReminderSlot[] = ['morning', 'midday', 'evening']
 
 export async function GET(req: Request) {
   const auth = req.headers.get('authorization')
@@ -7,9 +9,16 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Slot normally derives from the current ET hour; ?slot= overrides for
+  // manual testing.
+  const slotParam = new URL(req.url).searchParams.get('slot')
+  const slot = SLOTS.includes(slotParam as ReminderSlot)
+    ? (slotParam as ReminderSlot)
+    : undefined
+
   try {
-    await sendCheckinNotification()
-    return NextResponse.json({ ok: true })
+    const sent = await sendCheckinNotification(slot)
+    return NextResponse.json({ ok: true, slot: sent })
   } catch (err) {
     console.error('Cron check-in notification failed:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })

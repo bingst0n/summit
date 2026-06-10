@@ -52,13 +52,13 @@ pnpm lint       # ESLint
 
 ## Notifications
 
-Daily check-in fires at 7 PM via a Vercel Cron job hitting `GET /api/cron/checkin`, which calls the Pushcut webhook. Pushcut notification name and API secret are stored in environment variables.
+Tri-daily Pushcut focus reminders (8 AM / 12 PM / 6 PM ET) fire from a GitHub Actions schedule (`.github/workflows/reminders.yml` — cron lines are UTC and assume EDT; shift +1h when EST returns). Each run hits `GET /api/cron/checkin` with `CRON_SECRET` as a Bearer token (mirrored as a GitHub Actions secret). The route picks the slot message (morning ascent / midday check / evening final push) from the current ET hour; `?slot=` overrides for testing. Vercel Cron is NOT used — the Hobby plan allows only 2 jobs at once-per-day.
 
 ## Deployment
 
 - Production URL: `https://lockin-lake.vercel.app`
 - Vercel project: `bingst0ns-projects/lockin`
-- Cron fires at 23:00 UTC daily (= 7 PM ET) via `vercel.json`
+- Reminder schedule lives in GitHub Actions, not `vercel.json` (kept as an empty `crons` array)
 
 ## Environment Variables
 
