@@ -22,6 +22,10 @@ export default function AddTrackerForm({ goalId, onCreated, onCancel }: AddTrack
       setError('Name and a total of at least 1 are required.')
       return
     }
+    if (kind === 'steps' && !Number.isInteger(totalNum)) {
+      setError('Steps trackers need a whole number of parts.')
+      return
+    }
     setSaving(true)
     setError(null)
     try {
