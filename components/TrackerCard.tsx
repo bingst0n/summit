@@ -162,7 +162,9 @@ export default function TrackerCard({ tracker, onSaved, onDelete }: TrackerCardP
               defaultValue={tracker.total}
               onBlur={e => {
                 const v = Number(e.currentTarget.value)
-                if (Number.isFinite(v) && v >= 1 && v !== tracker.total) patch({ total: v })
+                if (!Number.isFinite(v) || v < 1 || v === tracker.total) return
+                if (tracker.kind === 'steps' && !Number.isInteger(v)) return
+                patch({ total: v })
               }}
               className="w-20 bg-panel2 border border-line rounded-lg px-2.5 py-1.5 font-mono text-sm outline-none focus:border-ember"
               aria-label="Tracker total"

@@ -1,16 +1,16 @@
--- Summit: one-time cleanup after the advisor messaging fix (2026-06-07)
--- The old brief route PREPENDED briefs to recent_messages, so the stored
--- conversation is scrambled (stale briefs stacked at the front, newest
--- trimmed instead of oldest). It also contains two test messages from
--- verifying the fix. Keep the compressed summary; clear just the message
--- list — the next app open generates one fresh, correctly-ordered brief.
--- Run in Supabase SQL Editor.
+-- Run in Supabase SQL editor (Dashboard → SQL Editor → New query)
+create table trackers (
+  id uuid primary key default gen_random_uuid(),
+  goal_id uuid not null references goals(id) on delete cascade,
+  name text not null,
+  kind text not null check (kind in ('steps', 'counter')),
+  total numeric not null,
+  current numeric not null default 0,
+  unit text,
+  step_labels jsonb,
+  source_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
 
-update conversation_state
-set recent_messages = '[]'::jsonb,
-    updated_at = now()
-where id = 1;
-
--- Verify:
--- select summary, jsonb_array_length(recent_messages) as msgs
--- from conversation_state where id = 1;
+alter table trackers disable row level security;

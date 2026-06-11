@@ -125,7 +125,7 @@ export default function AdvisorChat() {
   // Tracker positions must be persisted before /api/adjust runs so the
   // adjustment LLM redistributes from the fresh position, not the stale one.
   async function runTrackerUpdates(updates: ParsedTrackerUpdate[]) {
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       updates.map(u =>
         fetch(`/api/trackers/${u.tracker_id}`, {
           method: 'PATCH',
@@ -134,6 +134,11 @@ export default function AdvisorChat() {
         })
       )
     )
+    results.forEach((r, i) => {
+      if (r.status === 'rejected' || !r.value.ok) {
+        console.warn(`Tracker update failed for ${updates[i].tracker_id}`)
+      }
+    })
   }
 
   async function runCheckIn(checkIn: CheckInEntry[]) {

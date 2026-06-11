@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/claude'
 import { ADJUSTMENT_SYSTEM } from '@/lib/prompts'
 import { getGoal, getLogsForGoal, getFutureTasksForGoal, replaceFutureTasks, getTrackersForGoal } from '@/lib/db'
+import { nextStepLabel } from '@/lib/tracker'
 
 export const maxDuration = 60
 
@@ -39,6 +40,7 @@ export async function POST(req: Request) {
             current: t.current,
             total: t.total,
             unit: t.unit,
+            next: nextStepLabel(t),
           })),
         }),
       }],
