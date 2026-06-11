@@ -24,6 +24,17 @@ export const NAV_ITEMS = [
     ),
   },
   {
+    href: '/progress',
+    label: 'PROGRESS',
+    icon: (active: boolean) => (
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 3 : 2} strokeLinecap="round" strokeLinejoin="round">
+        <line x1="5" y1="21" x2="5" y2="13" />
+        <line x1="12" y1="21" x2="12" y2="5" />
+        <line x1="19" y1="21" x2="19" y2="9" />
+      </svg>
+    ),
+  },
+  {
     href: '/advisor',
     label: 'ADVISOR',
     icon: (active: boolean) => (

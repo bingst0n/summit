@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/claude'
 import { ADJUSTMENT_SYSTEM } from '@/lib/prompts'
-import { getGoal, getLogsForGoal, getFutureTasksForGoal, replaceFutureTasks } from '@/lib/db'
+import { getGoal, getLogsForGoal, getFutureTasksForGoal, replaceFutureTasks, getTrackersForGoal } from '@/lib/db'
+import { nextStepLabel } from '@/lib/tracker'
 
 export const maxDuration = 60
 
@@ -12,10 +13,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'goal_id required' }, { status: 400 })
     }
 
-    const [goal, logs, futureTasks] = await Promise.all([
+    const [goal, logs, futureTasks, trackers] = await Promise.all([
       getGoal(goal_id),
       getLogsForGoal(goal_id, 7),
       getFutureTasksForGoal(goal_id),
+      getTrackersForGoal(goal_id),
     ])
 
     if (!goal || goal.type !== 'continuous' || futureTasks.length === 0) {
@@ -28,7 +30,19 @@ export async function POST(req: Request) {
       system: ADJUSTMENT_SYSTEM,
       messages: [{
         role: 'user',
-        content: JSON.stringify({ goal, logs, futureTasks }),
+        content: JSON.stringify({
+          goal,
+          logs,
+          futureTasks,
+          trackers: trackers.map(t => ({
+            name: t.name,
+            kind: t.kind,
+            current: t.current,
+            total: t.total,
+            unit: t.unit,
+            next: nextStepLabel(t),
+          })),
+        }),
       }],
     })
 

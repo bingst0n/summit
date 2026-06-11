@@ -34,6 +34,27 @@ export interface CalendarMark {
   created_at: string
 }
 
+export type TrackerKind = 'steps' | 'counter'
+
+export interface Tracker {
+  id: string
+  goal_id: string
+  name: string
+  kind: TrackerKind
+  /** steps: number of steps (integer). counter: the target value. */
+  total: number
+  /** steps: last completed position (0 = not started). counter: current value. */
+  current: number
+  /** counter: "tests", "problems", "%". steps: the step noun, default "parts". */
+  unit: string | null
+  /** steps only: optional labels, length === total. */
+  step_labels: string[] | null
+  /** Set when built from a pasted course link. */
+  source_url: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string

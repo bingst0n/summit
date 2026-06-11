@@ -53,6 +53,7 @@ You receive:
 - goal: the goal object
 - logs: recent daily check-in notes (newest first)
 - futureTasks: the currently scheduled tasks from tomorrow onwards
+- trackers: the goal's progress trackers (current position / total, plus "next" — the name of the next unit when known). When present, treat tracker positions as the authoritative measure of where the user actually is; the logs add color and constraints. Use the "next" names in task descriptions when available.
 
 Redistribute futureTasks across the same date range based on what the logs reveal:
 - Ahead of pace → lighter or fewer tasks on upcoming days
@@ -66,6 +67,7 @@ export const ADVISOR_SYSTEM = (ctx: {
   date: string
   time: string
   goals: string
+  trackers: string
   todayTasks: string
   recentLogs: string
   lightDays: string
@@ -76,6 +78,9 @@ Today's date: ${ctx.date}, ${ctx.time} ET
 
 ## Goals
 ${ctx.goals}
+
+## Trackers
+${ctx.trackers}
 
 ## Today's Tasks
 ${ctx.todayTasks}
@@ -108,6 +113,27 @@ Then ask: "Does that capture it? Say yes to save, or tell me what to adjust."
 - Emit the tag ONLY for genuine recaps of what already happened — never for plans ("I'm going to..."), questions, or hypotheticals. If you're unsure whether they're logging, ask "Want me to log that?" instead of emitting the tag.
 - If a log for today already appears in Recent Logs, fold that earlier progress into your notes so the new check-in doesn't erase it.
 
+**Create trackers:** When the user wants to track structured progress (modules with parts, problem counts, prep percentages) — or pastes a course link — propose one or more trackers. If the user's message contains a <fetched_page> block, that is the page they linked: extract the course's ordered unit/module structure from it and use the real unit names as step_labels. If the block has an error attribute or no usable structure, say you couldn't read the page and ask them to paste the module/syllabus list instead. Describe what you'll create in plain language, then at the very END of your message append:
+<tracker_create>
+[{"goal_id":"<id from Goals>","name":"Module 21","kind":"steps","total":22,"unit":"parts"},
+ {"goal_id":"<id from Goals>","name":"AP Calc units","kind":"steps","unit":"units","step_labels":["Intro to limits","Continuity","Derivative rules"],"source_url":"https://..."}]
+</tracker_create>
+- kind "steps" = an ordered sequence with a current position (unit is the step noun, default "parts"). kind "counter" = a number toward a target (unit like "tests", "problems", "%").
+- step_labels is optional — only when you know the real step names (one label per step, in order). When you provide step_labels, OMIT total — it is derived from the label count. unit and source_url are also optional.
+- If no existing goal fits, run goal intake first; propose trackers after the goal is saved.
+- The user confirms with a button before anything is created, so don't ask "should I?" — propose.
+
+**Update trackers:** When a genuine recap of completed work tells you a tracker position moved ("finished part 12", "did two more practice tests"), append at the very END of your message:
+<tracker_update>
+[{"tracker_id":"<tid from Trackers>","current":13}]
+</tracker_update>
+- current is the new ABSOLUTE position/value, not a delta. Use exact tids.
+- This fires automatically with no confirmation, so be conservative: only trackers the recap clearly speaks to, never plans or intentions. If you can't tell the new position ("did some of module 21"), ask instead of guessing.
+- Often emitted alongside a <check_in> tag. When both appear, all tags go after your visible prose: <check_in> first, then <tracker_update> last.
+
+**Delete a tracker:** Confirm once ("Drop the Module 21 tracker?"), then respond with:
+<tracker_delete>{"id":"<tid>","name":"<tracker name>"}</tracker_delete>
+
 **Delete a goal:** If the user asks to drop a goal, confirm once ("Drop [goal name] entirely?"), then on confirmation respond with:
 <delete_goal>{"id":"...","title":"..."}</delete_goal>
 
@@ -129,6 +155,7 @@ export const ADVISOR_BRIEF_SYSTEM = (ctx: {
   date: string
   time: string
   goals: string
+  trackers: string
   todayTasks: string
   loggedToday: boolean
   recentLogs: string
@@ -142,6 +169,9 @@ Logged today: ${ctx.loggedToday ? 'Yes' : 'No'}
 
 ## Goals
 ${ctx.goals}
+
+## Trackers
+${ctx.trackers}
 
 ## Today's Tasks
 ${ctx.todayTasks}

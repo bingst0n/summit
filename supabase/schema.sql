@@ -45,8 +45,25 @@ create table conversation_state (
   updated_at timestamptz default now()
 );
 
+-- Fine-grained per-goal progress: steps (position in an ordered series) and
+-- counters (numeric value toward a target). Edited in the UI and by the advisor.
+create table trackers (
+  id uuid primary key default gen_random_uuid(),
+  goal_id uuid not null references goals(id) on delete cascade,
+  name text not null,
+  kind text not null check (kind in ('steps', 'counter')),
+  total numeric not null,
+  current numeric not null default 0,
+  unit text,
+  step_labels jsonb,
+  source_url text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 alter table goals disable row level security;
 alter table daily_tasks disable row level security;
 alter table daily_logs disable row level security;
 alter table calendar_marks disable row level security;
 alter table conversation_state disable row level security;
+alter table trackers disable row level security;

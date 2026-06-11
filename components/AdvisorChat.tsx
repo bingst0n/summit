@@ -7,8 +7,12 @@ import {
   extractGoalData,
   extractDeleteGoal,
   extractCheckIn,
+  extractTrackerCreate,
+  extractTrackerUpdate,
+  extractTrackerDelete,
   stripTags,
   type CheckInEntry,
+  type ParsedTrackerUpdate,
 } from '@/lib/advisorParse'
 import { today } from '@/lib/utils'
 
@@ -22,6 +26,8 @@ export default function AdvisorChat() {
   const [streaming, setStreaming] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [trackerSaving, setTrackerSaving] = useState(false)
+  const [trackerError, setTrackerError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [scheduleStatus, setScheduleStatus] = useState<'idle' | 'updating' | 'updated' | 'error'>('idle')
   const lastCheckInRef = useRef<CheckInEntry[] | null>(null)
@@ -113,6 +119,27 @@ export default function AdvisorChat() {
   const lastAssistantContent = [...messages].reverse().find(m => m.role === 'assistant')?.content ?? ''
   const pendingGoalData = extractGoalData(lastAssistantContent)
   const pendingDeleteGoal = extractDeleteGoal(lastAssistantContent)
+  const pendingTrackerCreate = extractTrackerCreate(lastAssistantContent)
+  const pendingTrackerDelete = extractTrackerDelete(lastAssistantContent)
+
+  // Tracker positions must be persisted before /api/adjust runs so the
+  // adjustment LLM redistributes from the fresh position, not the stale one.
+  async function runTrackerUpdates(updates: ParsedTrackerUpdate[]) {
+    const results = await Promise.allSettled(
+      updates.map(u =>
+        fetch(`/api/trackers/${u.tracker_id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ current: u.current }),
+        })
+      )
+    )
+    results.forEach((r, i) => {
+      if (r.status === 'rejected' || !r.value.ok) {
+        console.warn(`Tracker update failed for ${updates[i].tracker_id}`)
+      }
+    })
+  }
 
   async function runCheckIn(checkIn: CheckInEntry[]) {
     lastCheckInRef.current = checkIn
@@ -191,8 +218,11 @@ export default function AdvisorChat() {
     }
 
     if (ok) {
+      const trackerUpdates = extractTrackerUpdate(text)
+      if (trackerUpdates) await runTrackerUpdates(trackerUpdates)
       const checkIn = extractCheckIn(text)
       if (checkIn) runCheckIn(checkIn)
+      else if (trackerUpdates) router.refresh()
     }
   }
 
@@ -236,6 +266,45 @@ export default function AdvisorChat() {
     if (res.ok) {
       router.refresh()
       setMessages(prev => [...prev, { role: 'assistant', content: `✓ Goal "${pendingDeleteGoal.title}" removed.` }])
+    }
+  }
+
+  async function saveTrackers() {
+    if (!pendingTrackerCreate) return
+    setTrackerSaving(true)
+    setTrackerError(null)
+    try {
+      const res = await fetch('/api/trackers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackers: pendingTrackerCreate }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Server error ${res.status}`)
+      }
+      router.refresh()
+      const n = pendingTrackerCreate.length
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: `✓ Created ${n} tracker${n === 1 ? '' : 's'} — see the Progress tab.` },
+      ])
+    } catch (err) {
+      setTrackerError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setTrackerSaving(false)
+    }
+  }
+
+  async function deleteTracker() {
+    if (!pendingTrackerDelete) return
+    const res = await fetch(`/api/trackers/${pendingTrackerDelete.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.refresh()
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: `✓ Tracker "${pendingTrackerDelete.name}" removed.` },
+      ])
     }
   }
 
@@ -333,6 +402,36 @@ export default function AdvisorChat() {
               className="bg-[#e5484d] hover:brightness-110 active:brightness-90 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
             >
               Delete &quot;{pendingDeleteGoal.title}&quot;
+            </button>
+          </div>
+        )}
+
+        {/* Create trackers button */}
+        {pendingTrackerCreate && !streaming && (
+          <div className="flex flex-col items-center gap-2 pt-2">
+            {trackerError && <p className="text-warn text-xs text-center">{trackerError}</p>}
+            <button
+              onClick={saveTrackers}
+              disabled={trackerSaving}
+              className="bg-moss hover:brightness-110 active:brightness-90 disabled:opacity-50 text-moss-ink font-semibold px-8 py-3 rounded-2xl transition-colors"
+            >
+              {trackerSaving
+                ? 'Creating…'
+                : trackerError
+                  ? 'Retry'
+                  : `Create ${pendingTrackerCreate.length} tracker${pendingTrackerCreate.length === 1 ? '' : 's'} ✓`}
+            </button>
+          </div>
+        )}
+
+        {/* Delete tracker button */}
+        {pendingTrackerDelete && !streaming && (
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <button
+              onClick={deleteTracker}
+              className="bg-[#e5484d] hover:brightness-110 active:brightness-90 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
+            >
+              Delete tracker &quot;{pendingTrackerDelete.name}&quot;
             </button>
           </div>
         )}

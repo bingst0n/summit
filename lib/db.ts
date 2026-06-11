@@ -1,6 +1,6 @@
 import { supabase, supabaseServer } from './supabase'
 import { localDate } from './utils'
-import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState } from './types'
+import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState, Tracker } from './types'
 
 function db() {
   if (typeof window === 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -222,6 +222,52 @@ export async function setLightDays(dates: string[], light: boolean) {
     const { error } = await db().from('calendar_marks').delete().in('date', dates)
     if (error) throw error
   }
+}
+
+export async function getTrackers(): Promise<Tracker[]> {
+  const { data } = await db().from('trackers').select('*').order('created_at')
+  return data ?? []
+}
+
+export async function getTrackersForGoal(goalId: string): Promise<Tracker[]> {
+  const { data } = await db()
+    .from('trackers')
+    .select('*')
+    .eq('goal_id', goalId)
+    .order('created_at')
+  return data ?? []
+}
+
+export async function getTracker(id: string): Promise<Tracker | null> {
+  const { data } = await db().from('trackers').select('*').eq('id', id).single()
+  return data
+}
+
+export async function createTrackers(
+  rows: Array<Omit<Tracker, 'id' | 'created_at' | 'updated_at'>>
+): Promise<Tracker[]> {
+  const { data, error } = await db().from('trackers').insert(rows).select()
+  if (error) throw error
+  return data ?? []
+}
+
+export async function updateTracker(
+  id: string,
+  patch: Partial<Pick<Tracker, 'current' | 'name' | 'total' | 'unit'>>
+): Promise<Tracker> {
+  const { data, error } = await db()
+    .from('trackers')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteTracker(id: string) {
+  const { error } = await db().from('trackers').delete().eq('id', id)
+  if (error) throw error
 }
 
 export async function getConversationState(): Promise<ConversationState> {

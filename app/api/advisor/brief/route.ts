@@ -8,9 +8,11 @@ import {
   getLightDays,
   getConversationState,
   upsertConversationState,
+  getTrackers,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
 import { needsBrief } from '@/lib/conversation'
+import { buildTrackersSummary } from '@/lib/tracker'
 import type { ChatMessage } from '@/lib/types'
 
 export const maxDuration = 30
@@ -38,16 +40,19 @@ export async function GET() {
   })
   const horizonStr = localDate(30)
 
-  const [goals, todayTasks, recentLogs, lightDays] = await Promise.all([
+  const [goals, todayTasks, recentLogs, lightDays, trackers] = await Promise.all([
     getGoals(),
     getTodayTasks(date),
     getRecentLogs(7),
     getLightDays(date, horizonStr),
+    getTrackers(),
   ])
 
   const goalsSummary = goals.length === 0
     ? 'No goals set.'
     : goals.map(g => `- ${g.title} (${g.type}, due ${g.deadline})`).join('\n')
+
+  const trackersSummary = buildTrackersSummary(goals, trackers)
 
   const tasksSummary = todayTasks.length === 0
     ? 'No tasks scheduled today.'
@@ -78,6 +83,7 @@ export async function GET() {
     date,
     time,
     goals: goalsSummary,
+    trackers: trackersSummary,
     todayTasks: tasksSummary,
     loggedToday,
     recentLogs: logsSummary,
