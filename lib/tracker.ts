@@ -19,7 +19,7 @@ export function blendedPct(trackers: Array<Pick<Tracker, 'current' | 'total'>>):
  * walked down to zero.
  */
 export function pipTapTarget(current: number, tapped: number): number {
-  return tapped === current ? tapped - 1 : tapped
+  return Math.max(tapped === current ? tapped - 1 : tapped, 0)
 }
 
 export function clampCurrent(current: number, total: number): number {
@@ -34,6 +34,8 @@ export function nextStepLabel(
   const idx = Math.floor(t.current)
   const label = t.step_labels?.[idx]
   if (label) return label
+  // Naive -s strip covers Summit's step nouns (parts, units, chapters…);
+  // irregular nouns should use step_labels instead.
   const noun = (t.unit ?? 'parts').replace(/s$/, '')
   return `${noun} ${idx + 1}`
 }
@@ -157,5 +159,5 @@ export function buildTrackersSummary(goals: Goal[], trackers: Tracker[]): string
       )
     }
   }
-  return lines.join('\n')
+  return lines.length > 0 ? lines.join('\n') : 'No trackers.'
 }

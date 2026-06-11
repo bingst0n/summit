@@ -52,6 +52,9 @@ describe('blendedPct', () => {
   it('returns 0 for no trackers', () => {
     expect(blendedPct([])).toBe(0)
   })
+  it('rounds half-up on uneven fractions', () => {
+    expect(blendedPct([{ current: 1, total: 3 }])).toBe(33)
+  })
 })
 
 describe('pipTapTarget', () => {
@@ -64,6 +67,9 @@ describe('pipTapTarget', () => {
   })
   it('tapping pip 1 at position 1 clears to 0', () => {
     expect(pipTapTarget(1, 1)).toBe(0)
+  })
+  it('never goes below 0', () => {
+    expect(pipTapTarget(0, 0)).toBe(0)
   })
 })
 
