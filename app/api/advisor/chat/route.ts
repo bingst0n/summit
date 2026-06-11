@@ -11,9 +11,12 @@ import {
   getLightDays,
   getConversationState,
   upsertConversationState,
+  getTrackers,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
 import { toApiMessages } from '@/lib/conversation'
+import { buildTrackersSummary } from '@/lib/tracker'
+import { extractFirstUrl, fetchPageText } from '@/lib/fetchPage'
 import type { ChatMessage } from '@/lib/types'
 
 export const maxDuration = 60
@@ -50,17 +53,20 @@ export async function POST(req: Request) {
   })
   const horizonStr = localDate(30)
 
-  const [goals, todayTasks, recentLogs, lightDays, state] = await Promise.all([
+  const [goals, todayTasks, recentLogs, lightDays, state, trackers] = await Promise.all([
     getGoals(),
     getTodayTasks(date),
     getRecentLogs(7),
     getLightDays(date, horizonStr),
     getConversationState(),
+    getTrackers(),
   ])
 
   const goalsSummary = goals.length === 0
     ? 'No goals set.'
     : goals.map(g => `- [id:${g.id}] ${g.title} (${g.type}, due ${g.deadline})`).join('\n')
+
+  const trackersSummary = buildTrackersSummary(goals, trackers)
 
   const tasksSummary = todayTasks.length === 0
     ? 'No tasks scheduled today.'
@@ -84,17 +90,30 @@ export async function POST(req: Request) {
     date,
     time,
     goals: goalsSummary,
+    trackers: trackersSummary,
     todayTasks: tasksSummary,
     recentLogs: logsSummary,
     lightDays: lightDaySummary,
     summary: state.summary,
   })
 
-  const messagesForApi = toApiMessages(state.recent_messages, message)
+  // If the user pasted a link, fetch it now and show the page text to the model
+  // only — the persisted conversation keeps the message as typed, so page dumps
+  // never bloat conversation_state or the compression loop.
+  let modelMessage = message
+  const url = extractFirstUrl(message)
+  if (url) {
+    const page = await fetchPageText(url)
+    modelMessage = page.ok
+      ? `${message}\n\n<fetched_page url="${url}">\n${page.text}\n</fetched_page>`
+      : `${message}\n\n<fetched_page url="${url}" error="${page.error}"></fetched_page>`
+  }
+
+  const messagesForApi = toApiMessages(state.recent_messages, modelMessage)
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 1024,
+    max_tokens: 2048,
     system: systemPrompt,
     messages: messagesForApi,
   })
