@@ -15,18 +15,18 @@ export function slotForHour(h: number): ReminderSlot {
 
 const REMINDERS: Record<ReminderSlot, { title: (day: string) => string; text: string; path: string }> = {
   morning: {
-    title: day => `⛰ ${day} — morning ascent`,
-    text: 'Lock in. Hit the first waypoint before anything else takes your attention.',
+    title: day => `Summit · ${day}`,
+    text: 'Morning: lock in and start your first task before anything else.',
     path: '/',
   },
   midday: {
-    title: day => `⛰ ${day} — midday check`,
-    text: 'Stay on route. Clear the next waypoint before the afternoon slips.',
+    title: day => `Summit · ${day}`,
+    text: 'Midday check: stay focused — knock out the next task on your list.',
     path: '/',
   },
   evening: {
-    title: day => `⛰ ${day} — final push`,
-    text: "Finish today's waypoints, then radio basecamp with your climb.",
+    title: day => `Summit · ${day}`,
+    text: 'Evening: finish up your tasks, then log your day with the advisor.',
     path: '/advisor',
   },
 }
@@ -40,7 +40,7 @@ export async function sendCheckinNotification(slot?: ReminderSlot) {
 
   const resolved = slot ?? slotForHour(etHour())
   const day = seasonDay(today())
-  const dayLabel = day > 0 ? `Day ${day}` : 'Basecamp'
+  const dayLabel = day > 0 ? `Day ${day}` : 'Starting soon'
   const reminder = REMINDERS[resolved]
   // Fall back to prod so a missing env var can't produce "undefined/advisor".
   const base = process.env.NEXT_PUBLIC_APP_URL ?? 'https://lockin-lake.vercel.app'

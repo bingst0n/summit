@@ -26,7 +26,7 @@ export default async function HistoryPage() {
   return (
     <div className="px-4 pt-safe pb-safe">
       <div className="py-6">
-        <p className="font-mono text-[11px] tracking-[0.18em] text-mut">📓 LOGBOOK</p>
+        <p className="font-mono text-[11px] tracking-[0.18em] text-mut">CHECK-IN LOG</p>
         <h1 className="text-3xl font-bold tracking-tight mt-1">History</h1>
       </div>
 

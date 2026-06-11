@@ -101,7 +101,7 @@ export default function DaySheet({ date, tasks, goals, isLight, onClose, onLight
 
           {/* Tasks */}
           {tasks.length === 0 ? (
-            <p className="text-mut text-sm text-center py-4">No waypoints scheduled</p>
+            <p className="text-mut text-sm text-center py-4">No tasks scheduled</p>
           ) : (
             <div className="space-y-2">
               {tasks.map(task => {

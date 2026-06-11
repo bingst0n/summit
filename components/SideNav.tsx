@@ -15,7 +15,7 @@ export default function SideNav() {
         </svg>
         <span className="text-xl font-bold tracking-tight">Summit</span>
       </Link>
-      <p className="px-3 mb-8 font-mono text-[10px] tracking-[0.18em] text-mut">EXPEDITION LOG</p>
+      <p className="px-3 mb-8 font-mono text-[10px] tracking-[0.18em] text-mut">GOAL TRACKER</p>
 
       <div className="flex flex-col gap-1">
         {NAV_ITEMS.map(item => {
@@ -37,7 +37,6 @@ export default function SideNav() {
         })}
       </div>
 
-      <p className="mt-auto px-3 font-mono text-[10px] tracking-[0.14em] text-mut/60">● ON ROUTE</p>
     </nav>
   )
 }

@@ -52,7 +52,7 @@ pnpm lint       # ESLint
 
 ## Notifications
 
-Tri-daily Pushcut focus reminders (8 AM / 12 PM / 6 PM ET) fire from a GitHub Actions schedule (`.github/workflows/reminders.yml` — cron lines are UTC and assume EDT; shift +1h when EST returns). Each run hits `GET /api/cron/checkin` with `CRON_SECRET` as a Bearer token (mirrored as a GitHub Actions secret). The route picks the slot message (morning ascent / midday check / evening final push) from the current ET hour; `?slot=` overrides for testing. Vercel Cron is NOT used — the Hobby plan allows only 2 jobs at once-per-day.
+Tri-daily Pushcut focus reminders (8 AM / 12 PM / 6 PM ET) fire from a GitHub Actions schedule (`.github/workflows/reminders.yml` — cron lines are UTC and assume EDT; shift +1h when EST returns). Each run hits `GET /api/cron/checkin` with `CRON_SECRET` as a Bearer token (mirrored as a GitHub Actions secret). The route picks the slot message (morning / midday / evening focus reminders; evening deep-links to the advisor) from the current ET hour; `?slot=` overrides for testing. Vercel Cron is NOT used — the Hobby plan allows only 2 jobs at once-per-day.
 
 ## Deployment
 

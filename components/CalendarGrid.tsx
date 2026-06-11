@@ -60,7 +60,7 @@ export default function CalendarGrid({
           <div key={d} className="text-center font-mono text-[10px] tracking-[0.1em] text-mut/70 py-1">{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-y-1">
+      <div className="grid grid-cols-7 gap-1">
         {cells.map((day, i) => {
           if (!day) return <div key={i} />
 
@@ -78,7 +78,7 @@ export default function CalendarGrid({
               aria-pressed={selectMode ? isPicked : undefined}
               className={`relative flex flex-col items-center py-2 md:py-3 rounded-lg transition-colors ${
                 isPicked
-                  ? 'bg-ice/15 ring-2 ring-ice'
+                  ? 'bg-ice/15 ring-2 ring-inset ring-ice'
                   : isSelected
                   ? 'bg-ember'
                   : isLight

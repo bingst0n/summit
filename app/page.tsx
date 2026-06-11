@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import type { DailyTask } from '@/lib/types'
 import { getGoals, getTodayTasks, getLogsForDate, getTasksInRange, getTaskStats, getAllLogs } from '@/lib/db'
-import { today, localDate, formatDate, SEASON, seasonDay, seasonLength, seasonProgress, logStreak } from '@/lib/utils'
+import { today, localDate, daysUntil, SEASON, seasonDay, seasonLength, seasonProgress, logStreak } from '@/lib/utils'
 import TaskItem from '@/components/TaskItem'
 import ElevationProfile from '@/components/ElevationProfile'
 
@@ -40,6 +40,7 @@ export default async function HomePage() {
   const len = seasonLength()
   const fraction = seasonProgress(date)
   const pct = Math.round(fraction * 100)
+  const daysLeft = Math.max(0, daysUntil(SEASON.end))
   const preSeason = dayNum === 0
 
   const doneCount = todayTasks.filter(t => t.completed).length
@@ -70,8 +71,8 @@ export default async function HomePage() {
     .toUpperCase()
   const altLine = [
     dateLabel,
-    todayTasks.length > 0 ? `${doneCount}/${todayTasks.length} WAYPOINTS` : null,
-    `${pct}% CLIMBED`,
+    todayTasks.length > 0 ? `${doneCount}/${todayTasks.length} TASKS DONE` : null,
+    `${daysLeft} DAY${daysLeft === 1 ? '' : 'S'} LEFT`,
   ].filter(Boolean).join(' · ')
 
   return (
@@ -79,11 +80,11 @@ export default async function HomePage() {
       {/* Header */}
       <div className="pt-5 pb-4">
         <div className="flex justify-between items-center font-mono text-[11px] tracking-[0.18em] text-mut">
-          <span>SUMMIT · EXPEDITION LOG</span>
+          <span>SUMMIT</span>
           {preSeason ? (
-            <span className="text-ice">● BASECAMP · STARTS {formatDate(SEASON.start).toUpperCase()}</span>
+            <span className="text-ice">STARTS IN {daysUntil(SEASON.start)} DAY{daysUntil(SEASON.start) === 1 ? '' : 'S'}</span>
           ) : (
-            <span className="text-moss">● ON ROUTE</span>
+            streak > 0 && <span className="text-moss">● STREAK {streak}</span>
           )}
         </div>
         <h1 className="text-[32px] font-bold tracking-tight mt-2.5 leading-none">
@@ -94,12 +95,12 @@ export default async function HomePage() {
 
       <ElevationProfile
         fraction={fraction}
-        leftLabel={`YOU · ${pct}% CLIMBED`}
-        rightLabel={`SUMMIT · ${formatDate(SEASON.end).toUpperCase()}`}
+        leftLabel={`${pct}% COMPLETE`}
+        rightLabel={`${daysLeft} DAY${daysLeft === 1 ? '' : 'S'} LEFT`}
       />
 
       <div className="md:grid md:grid-cols-5 md:gap-8 md:items-start">
-        {/* Today's waypoints */}
+        {/* Today's tasks */}
         <div className="md:col-span-3">
           {nowTask && (
             <>
@@ -137,7 +138,7 @@ export default async function HomePage() {
 
           {cleared.length > 0 && (
             <>
-              <SectionHead>CLEARED</SectionHead>
+              <SectionHead>DONE</SectionHead>
               <div className="space-y-2">
                 {cleared.map(task => {
                   const goal = goalMap[task.goal_id]
@@ -152,17 +153,17 @@ export default async function HomePage() {
             <>
               <SectionHead>TODAY</SectionHead>
               <div className="bg-panel border border-line rounded-2xl p-6 text-center">
-                <p className="text-mut text-sm">No waypoints today — rest day at camp. ⛺</p>
+                <p className="text-mut text-sm">No tasks today — rest day.</p>
               </div>
             </>
           )}
         </div>
 
-        {/* Routes + coming up */}
+        {/* Goals + coming up */}
         <div className="md:col-span-2">
           {goals.length > 0 && (
             <>
-              <SectionHead>ROUTES</SectionHead>
+              <SectionHead>GOALS</SectionHead>
               <div className="flex gap-2.5 overflow-x-auto pb-1 md:flex-col md:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {goals.map(g => {
                   const s = stats[g.id] ?? { total: 0, done: 0, overdue: 0 }
@@ -186,12 +187,12 @@ export default async function HomePage() {
                       </div>
                       <p className="font-mono text-[10.5px] text-mut mt-2">
                         {s.total === 0 ? (
-                          <span className="text-ice">NO ROUTE YET</span>
+                          <span className="text-ice">NO SCHEDULE YET</span>
                         ) : (
                           <>
                             {s.done}/{s.total} ·{' '}
                             {behind ? (
-                              <span className="text-warn">−{s.overdue}D DRIFT</span>
+                              <span className="text-warn">{s.overdue} DAY{s.overdue === 1 ? '' : 'S'} BEHIND</span>
                             ) : (
                               <span className="text-moss">ON PACE</span>
                             )}
@@ -207,7 +208,7 @@ export default async function HomePage() {
 
           {hasUpcoming && (
             <>
-              <SectionHead>AHEAD</SectionHead>
+              <SectionHead>COMING UP</SectionHead>
               <div className="space-y-1.5">
                 {upcomingDays.map(d => {
                   const count = upcomingTasks[d]?.length ?? 0
@@ -225,7 +226,7 @@ export default async function HomePage() {
                           .toUpperCase()}
                       </span>
                       <span className="font-mono text-[10.5px] text-mut">
-                        {count} WAYPOINT{count !== 1 ? 'S' : ''}
+                        {count} TASK{count !== 1 ? 'S' : ''}
                       </span>
                     </Link>
                   )
@@ -239,12 +240,12 @@ export default async function HomePage() {
       {/* Empty state */}
       {goals.length === 0 && (
         <div className="bg-panel border border-line rounded-2xl p-8 text-center mt-6">
-          <p className="text-mut text-sm mb-5">No routes plotted yet. Radio your advisor to chart the first one.</p>
+          <p className="text-mut text-sm mb-5">No goals yet. Talk to your advisor to add one.</p>
           <Link
             href="/advisor"
             className="inline-block bg-ember hover:bg-ember2 text-ember-ink text-sm font-bold px-5 py-2.5 rounded-xl transition-colors"
           >
-            📻 Radio basecamp
+            Open Advisor
           </Link>
         </div>
       )}
@@ -256,13 +257,13 @@ export default async function HomePage() {
       >
         <div className="relative overflow-hidden bg-panel/95 backdrop-blur border border-line rounded-2xl px-4 pt-3 pb-3.5 shadow-[0_-12px_44px_rgba(0,0,0,0.45)] md:shadow-none md:hover:border-[#2a4060] transition-colors">
           <p className="font-mono text-[10.5px] tracking-[0.06em] text-mut">
-            📻 {loggedToday
+            {loggedToday
               ? `LOGGED TODAY${streak > 0 ? ` · STREAK ${streak}` : ''}`
-              : `RADIO BASECAMP · DUE 19:00${streak > 0 ? ` · STREAK ${streak}` : ''}`}
+              : `DAILY CHECK-IN${streak > 0 ? ` · STREAK ${streak}` : ''}`}
           </p>
           <div className="flex justify-between items-center mt-1">
             <span className="font-bold text-[16px]">
-              {loggedToday ? 'Climb logged — route adjusting.' : "How did today's climb go?"}
+              {loggedToday ? 'Logged — schedule adjusting.' : 'How did today go?'}
             </span>
             <span className="text-mut text-sm">›</span>
           </div>
