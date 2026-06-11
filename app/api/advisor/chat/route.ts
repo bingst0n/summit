@@ -106,7 +106,7 @@ export async function POST(req: Request) {
     const page = await fetchPageText(url)
     modelMessage = page.ok
       ? `${message}\n\n<fetched_page url="${url}">\n${page.text}\n</fetched_page>`
-      : `${message}\n\n<fetched_page url="${url}" error="${page.error}"></fetched_page>`
+      : `${message}\n\n<fetched_page url="${url}" error="${page.error.replace(/"/g, '&quot;')}"></fetched_page>`
   }
 
   const messagesForApi = toApiMessages(state.recent_messages, modelMessage)
