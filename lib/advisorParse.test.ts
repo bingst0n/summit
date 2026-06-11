@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { extractGoalData, extractDeleteGoal, extractCheckIn, stripTags } from './advisorParse'
+import {
+  extractGoalData,
+  extractDeleteGoal,
+  extractCheckIn,
+  extractTrackerCreate,
+  extractTrackerUpdate,
+  extractTrackerDelete,
+  stripTags,
+} from './advisorParse'
 
 describe('extractCheckIn', () => {
   it('parses a single-goal check-in', () => {
@@ -77,5 +85,68 @@ describe('stripTags', () => {
   it('strips multiple tag types and trims', () => {
     const text = '  Done <check_in>[{"goal_id":"g1","notes":"x"}]</check_in> <goal_data>{"a":1}</goal_data>  '
     expect(stripTags(text)).toBe('Done')
+  })
+})
+
+describe('extractTrackerCreate', () => {
+  it('parses a tracker list', () => {
+    const text =
+      'Setting these up.\n<tracker_create>[{"goal_id":"g1","name":"Module 21","kind":"steps","total":22}]</tracker_create>'
+    expect(extractTrackerCreate(text)).toEqual([
+      { goal_id: 'g1', name: 'Module 21', kind: 'steps', total: 22 },
+    ])
+  })
+  it('accepts step_labels in place of total', () => {
+    const text =
+      '<tracker_create>[{"goal_id":"g1","name":"Units","kind":"steps","step_labels":["a","b"]}]</tracker_create>'
+    expect(extractTrackerCreate(text)).toEqual([
+      { goal_id: 'g1', name: 'Units', kind: 'steps', step_labels: ['a', 'b'] },
+    ])
+  })
+  it('drops malformed entries, null when all malformed or no tag', () => {
+    const text =
+      '<tracker_create>[{"goal_id":"g1","name":"ok","kind":"counter","total":5},{"kind":"counter"}]</tracker_create>'
+    expect(extractTrackerCreate(text)).toEqual([
+      { goal_id: 'g1', name: 'ok', kind: 'counter', total: 5 },
+    ])
+    expect(extractTrackerCreate('<tracker_create>[{"kind":"x"}]</tracker_create>')).toBeNull()
+    expect(extractTrackerCreate('no tag')).toBeNull()
+    expect(extractTrackerCreate('<tracker_create>nope</tracker_create>')).toBeNull()
+  })
+})
+
+describe('extractTrackerUpdate', () => {
+  it('parses updates', () => {
+    const text = 'Logged!\n<tracker_update>[{"tracker_id":"t1","current":13}]</tracker_update>'
+    expect(extractTrackerUpdate(text)).toEqual([{ tracker_id: 't1', current: 13 }])
+  })
+  it('drops entries without a numeric current or string id', () => {
+    const text =
+      '<tracker_update>[{"tracker_id":"t1","current":"13"},{"tracker_id":"t2","current":4}]</tracker_update>'
+    expect(extractTrackerUpdate(text)).toEqual([{ tracker_id: 't2', current: 4 }])
+  })
+  it('returns null when absent or malformed', () => {
+    expect(extractTrackerUpdate('hi')).toBeNull()
+    expect(extractTrackerUpdate('<tracker_update>{}</tracker_update>')).toBeNull()
+  })
+})
+
+describe('extractTrackerDelete', () => {
+  it('parses a delete', () => {
+    expect(
+      extractTrackerDelete('<tracker_delete>{"id":"t1","name":"Module 21"}</tracker_delete>')
+    ).toEqual({ id: 't1', name: 'Module 21' })
+  })
+  it('returns null when absent or malformed', () => {
+    expect(extractTrackerDelete('hi')).toBeNull()
+    expect(extractTrackerDelete('<tracker_delete>nope</tracker_delete>')).toBeNull()
+  })
+})
+
+describe('stripTags (tracker tags)', () => {
+  it('removes all three tracker tags', () => {
+    const text =
+      'Before <tracker_create>[1]</tracker_create> mid <tracker_update>[2]</tracker_update> and <tracker_delete>{}</tracker_delete> after'
+    expect(stripTags(text)).toBe('Before  mid  and  after')
   })
 })
