@@ -73,6 +73,7 @@ export interface ParsedTrackerDelete {
   name: string
 }
 
+// All extractors match the FIRST tag occurrence only — the advisor is instructed to emit one tag per message.
 export function extractTrackerCreate(text: string): ParsedTrackerCreate[] | null {
   const match = text.match(/<tracker_create>([\s\S]*?)<\/tracker_create>/)
   if (!match) return null
@@ -86,7 +87,9 @@ export function extractTrackerCreate(text: string): ParsedTrackerCreate[] | null
         typeof t.name === 'string' &&
         (t.kind === 'steps' || t.kind === 'counter') &&
         (typeof t.total === 'number' ||
-          (Array.isArray(t.step_labels) && t.step_labels.length > 0))
+          (Array.isArray(t.step_labels) &&
+            t.step_labels.length > 0 &&
+            t.step_labels.every((l: unknown) => typeof l === 'string')))
     )
     return valid.length > 0 ? valid : null
   } catch {

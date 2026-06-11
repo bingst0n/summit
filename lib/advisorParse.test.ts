@@ -113,6 +113,14 @@ describe('extractTrackerCreate', () => {
     expect(extractTrackerCreate('no tag')).toBeNull()
     expect(extractTrackerCreate('<tracker_create>nope</tracker_create>')).toBeNull()
   })
+  it('rejects steps entries with neither total nor step_labels', () => {
+    expect(
+      extractTrackerCreate('<tracker_create>[{"goal_id":"g1","name":"x","kind":"steps"}]</tracker_create>')
+    ).toBeNull()
+    expect(
+      extractTrackerCreate('<tracker_create>[{"goal_id":"g1","name":"x","kind":"steps","step_labels":[1,2]}]</tracker_create>')
+    ).toBeNull()
+  })
 })
 
 describe('extractTrackerUpdate', () => {
