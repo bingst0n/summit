@@ -71,9 +71,7 @@ export function extractCheckIn(text: string): CheckInEntry[] | null {
     const cleaned: CheckInEntry[] = valid.map(e => ({
       goal_id: e.goal_id,
       notes: e.notes,
-      ...(typeof (e as Record<string, unknown>).done === 'boolean'
-        ? { done: (e as Record<string, unknown>).done as boolean }
-        : {}),
+      ...(typeof e.done === 'boolean' ? { done: e.done } : {}),
     }))
     return cleaned.length > 0 ? cleaned : null
   } catch {
