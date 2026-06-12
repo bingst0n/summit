@@ -1,5 +1,6 @@
 import { supabase, supabaseServer } from './supabase'
-import { localDate } from './utils'
+import { localDate, addDays } from './utils'
+import { filterByMatch } from './appEdit'
 import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState, Tracker } from './types'
 
 function db() {
@@ -29,6 +30,14 @@ export async function createGoal(
 
 export async function deleteGoal(id: string) {
   const { error } = await db().from('goals').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function updateGoal(
+  id: string,
+  patch: Partial<Pick<Goal, 'title' | 'description' | 'deadline'>>
+) {
+  const { error } = await db().from('goals').update(patch).eq('id', id)
   if (error) throw error
 }
 
@@ -128,6 +137,68 @@ export async function getTaskStats(): Promise<Array<Pick<DailyTask, 'goal_id' | 
     .from('daily_tasks')
     .select('goal_id, date, completed')
   return data ?? []
+}
+
+/** Delete incomplete tasks in [from, to] (all goals when goalId is null). Returns count. */
+export async function deleteTasksInRange(
+  goalId: string | null,
+  from: string,
+  to: string,
+  match?: string
+): Promise<number> {
+  let q = db().from('daily_tasks').select('id, description, completed').gte('date', from).lte('date', to)
+  if (goalId) q = q.eq('goal_id', goalId)
+  const { data } = await q
+  const targets = filterByMatch((data ?? []).filter(t => !t.completed), match)
+  if (targets.length === 0) return 0
+  const { error } = await db().from('daily_tasks').delete().in('id', targets.map(t => t.id))
+  if (error) throw error
+  return targets.length
+}
+
+/** Shift incomplete tasks in [from, to] by `days`. Returns count. */
+export async function shiftTasks(
+  goalId: string | null,
+  from: string,
+  to: string,
+  days: number,
+  match?: string
+): Promise<number> {
+  let q = db().from('daily_tasks').select('id, date, description, completed').gte('date', from).lte('date', to)
+  if (goalId) q = q.eq('goal_id', goalId)
+  const { data } = await q
+  const targets = filterByMatch((data ?? []).filter(t => !t.completed), match)
+  for (const t of targets) {
+    const { error } = await db().from('daily_tasks').update({ date: addDays(t.date, days) }).eq('id', t.id)
+    if (error) throw error
+  }
+  return targets.length
+}
+
+export async function createDailyTask(goalId: string, date: string, description: string) {
+  const { error } = await db().from('daily_tasks').insert({ goal_id: goalId, date, description })
+  if (error) throw error
+}
+
+export async function getTasksForGoalDate(goalId: string, date: string): Promise<DailyTask[]> {
+  const { data } = await db()
+    .from('daily_tasks')
+    .select('*')
+    .eq('goal_id', goalId)
+    .eq('date', date)
+    .order('created_at')
+  return data ?? []
+}
+
+export async function updateTaskDescription(id: string, description: string) {
+  const { error } = await db().from('daily_tasks').update({ description }).eq('id', id)
+  if (error) throw error
+}
+
+export async function setTasksCompleted(ids: string[], completed: boolean) {
+  if (ids.length === 0) return
+  const { error } = await db().from('daily_tasks').update({ completed }).in('id', ids)
+  if (error) throw error
 }
 
 export async function getLogsForDate(date: string): Promise<DailyLog[]> {
