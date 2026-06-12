@@ -15,6 +15,8 @@ export interface ParsedDeleteGoal {
 export interface CheckInEntry {
   goal_id: string
   notes: string
+  /** Recap says the user finished this goal's planned work today — check the task(s) off. */
+  done?: boolean
 }
 
 export function extractGoalData(text: string): ParsedGoalData | null {
@@ -37,6 +39,25 @@ export function extractDeleteGoal(text: string): ParsedDeleteGoal | null {
   }
 }
 
+export interface ParsedAppEdit {
+  summary: string
+  /** Raw op objects — validated server-side by /api/app-edit, not at parse time. */
+  ops: unknown[]
+}
+
+export function extractAppEdit(text: string): ParsedAppEdit | null {
+  const match = text.match(/<app_edit>([\s\S]*?)<\/app_edit>/)
+  if (!match) return null
+  try {
+    const parsed = JSON.parse(match[1].trim())
+    if (!parsed || typeof parsed.summary !== 'string' || !parsed.summary.trim()) return null
+    if (!Array.isArray(parsed.ops) || parsed.ops.length === 0) return null
+    return { summary: parsed.summary.trim(), ops: parsed.ops }
+  } catch {
+    return null
+  }
+}
+
 export function extractCheckIn(text: string): CheckInEntry[] | null {
   const match = text.match(/<check_in>([\s\S]*?)<\/check_in>/)
   if (!match) return null
@@ -47,7 +68,14 @@ export function extractCheckIn(text: string): CheckInEntry[] | null {
       (e): e is CheckInEntry =>
         !!e && typeof e.goal_id === 'string' && typeof e.notes === 'string'
     )
-    return valid.length > 0 ? valid : null
+    const cleaned: CheckInEntry[] = valid.map(e => ({
+      goal_id: e.goal_id,
+      notes: e.notes,
+      ...(typeof (e as Record<string, unknown>).done === 'boolean'
+        ? { done: (e as Record<string, unknown>).done as boolean }
+        : {}),
+    }))
+    return cleaned.length > 0 ? cleaned : null
   } catch {
     return null
   }
@@ -130,6 +158,7 @@ export function stripTags(text: string): string {
     .replace(/<goal_data>[\s\S]*?<\/goal_data>/g, '')
     .replace(/<delete_goal>[\s\S]*?<\/delete_goal>/g, '')
     .replace(/<check_in>[\s\S]*?<\/check_in>/g, '')
+    .replace(/<app_edit>[\s\S]*?<\/app_edit>/g, '')
     .replace(/<tracker_create>[\s\S]*?<\/tracker_create>/g, '')
     .replace(/<tracker_update>[\s\S]*?<\/tracker_update>/g, '')
     .replace(/<tracker_delete>[\s\S]*?<\/tracker_delete>/g, '')

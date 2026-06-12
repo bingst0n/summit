@@ -3,6 +3,7 @@ import {
   extractGoalData,
   extractDeleteGoal,
   extractCheckIn,
+  extractAppEdit,
   extractTrackerCreate,
   extractTrackerUpdate,
   extractTrackerDelete,
@@ -156,5 +157,39 @@ describe('stripTags (tracker tags)', () => {
     const text =
       'Before <tracker_create>[1]</tracker_create> mid <tracker_update>[2]</tracker_update> and <tracker_delete>{}</tracker_delete> after'
     expect(stripTags(text)).toBe('Before  mid  and  after')
+  })
+})
+
+describe('extractAppEdit', () => {
+  it('parses summary + ops', () => {
+    const text =
+      'Here is the plan.\n<app_edit>{"summary":"Delete pre-season tasks","ops":[{"op":"task_delete","goal_id":null,"from":"2026-06-10","to":"2026-06-14"}]}</app_edit>'
+    expect(extractAppEdit(text)).toEqual({
+      summary: 'Delete pre-season tasks',
+      ops: [{ op: 'task_delete', goal_id: null, from: '2026-06-10', to: '2026-06-14' }],
+    })
+  })
+  it('returns null when absent, malformed, missing summary, or empty ops', () => {
+    expect(extractAppEdit('no tag')).toBeNull()
+    expect(extractAppEdit('<app_edit>not json</app_edit>')).toBeNull()
+    expect(extractAppEdit('<app_edit>{"ops":[{"op":"light_day"}]}</app_edit>')).toBeNull()
+    expect(extractAppEdit('<app_edit>{"summary":"x","ops":[]}</app_edit>')).toBeNull()
+  })
+})
+
+describe('extractCheckIn done flag', () => {
+  it('passes done through when boolean', () => {
+    const text = '<check_in>[{"goal_id":"g1","notes":"finished today","done":true}]</check_in>'
+    expect(extractCheckIn(text)).toEqual([{ goal_id: 'g1', notes: 'finished today', done: true }])
+  })
+  it('drops a non-boolean done', () => {
+    const text = '<check_in>[{"goal_id":"g1","notes":"x","done":"yes"}]</check_in>'
+    expect(extractCheckIn(text)).toEqual([{ goal_id: 'g1', notes: 'x' }])
+  })
+})
+
+describe('stripTags (app_edit)', () => {
+  it('removes the app_edit tag', () => {
+    expect(stripTags('Before <app_edit>{"summary":"x","ops":[1]}</app_edit> after')).toBe('Before  after')
   })
 })
