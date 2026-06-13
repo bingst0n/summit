@@ -64,13 +64,6 @@ export interface ChatMessage {
   ts?: string
 }
 
-export interface ConversationState {
-  id: number
-  summary: string
-  recent_messages: ChatMessage[]
-  updated_at: string
-}
-
 export interface Conversation {
   id: string
   title: string | null

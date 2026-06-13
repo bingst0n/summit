@@ -2,7 +2,7 @@ import { supabase, supabaseServer } from './supabase'
 import { localDate, addDays } from './utils'
 import { filterByMatch } from './appEdit'
 import { stripTags } from './advisorParse'
-import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState, Conversation, ConversationSummary, ChatMessage, Tracker } from './types'
+import type { Goal, DailyTask, DailyLog, CalendarMark, Conversation, ConversationSummary, ChatMessage, Tracker } from './types'
 
 function db() {
   if (typeof window === 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -339,24 +339,6 @@ export async function updateTracker(
 
 export async function deleteTracker(id: string) {
   const { error } = await db().from('trackers').delete().eq('id', id)
-  if (error) throw error
-}
-
-export async function getConversationState(): Promise<ConversationState> {
-  const { data } = await db()
-    .from('conversation_state')
-    .select('*')
-    .eq('id', 1)
-    .single()
-  return data ?? { id: 1, summary: '', recent_messages: [], updated_at: new Date().toISOString() }
-}
-
-export async function upsertConversationState(
-  state: Pick<ConversationState, 'summary' | 'recent_messages'>
-) {
-  const { error } = await db()
-    .from('conversation_state')
-    .upsert({ id: 1, ...state, updated_at: new Date().toISOString() })
   if (error) throw error
 }
 
