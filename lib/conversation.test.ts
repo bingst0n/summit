@@ -176,4 +176,9 @@ describe('shouldGenerateTitle', () => {
     const messages: ChatMessage[] = [userMsg('hi'), { role: 'assistant', content: '' }]
     expect(shouldGenerateTitle(messages, null)).toBe(false)
   })
+
+  it('treats an empty-string title as no title', () => {
+    const messages: ChatMessage[] = [userMsg('hi'), { role: 'assistant', content: 'hey' }]
+    expect(shouldGenerateTitle(messages, '')).toBe(true)
+  })
 })

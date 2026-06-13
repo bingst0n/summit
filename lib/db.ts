@@ -406,7 +406,7 @@ export async function appendMessages(id: string, msgs: ChatMessage[]): Promise<v
 }
 
 export async function setConversationTitle(id: string, title: string): Promise<void> {
-  const { error } = await db().from('conversations').update({ title }).eq('id', id)
+  const { error } = await db().from('conversations').update({ title, updated_at: new Date().toISOString() }).eq('id', id)
   if (error) throw error
 }
 
