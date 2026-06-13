@@ -1,16 +1,22 @@
--- Run in Supabase SQL editor (Dashboard → SQL Editor → New query)
-create table trackers (
+-- Migration: single-row conversation_state -> multi-row conversations
+-- Run in the Supabase SQL editor.
+
+create table conversations (
   id uuid primary key default gen_random_uuid(),
-  goal_id uuid not null references goals(id) on delete cascade,
-  name text not null,
-  kind text not null check (kind in ('steps', 'counter')),
-  total numeric not null,
-  current numeric not null default 0,
-  unit text,
-  step_labels jsonb,
-  source_url text,
+  title text,
+  messages jsonb not null default '[]',
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
 
-alter table trackers disable row level security;
+create index conversations_updated_at_idx on conversations (updated_at desc);
+
+alter table conversations disable row level security;
+
+-- Preserve the existing single thread as one conversation (the rolling summary is dropped).
+insert into conversations (messages, created_at, updated_at)
+select recent_messages, coalesce(updated_at, now()), coalesce(updated_at, now())
+from conversation_state
+where id = 1 and jsonb_array_length(recent_messages) > 0;
+
+drop table conversation_state;

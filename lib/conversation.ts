@@ -40,7 +40,7 @@ export function needsBrief(
 
 /**
  * Convert stored history + the new user message into the Messages API shape:
- * metadata stripped, capped at the last 10 turns, no blank content, and a
+ * metadata stripped, capped at the last 40 turns, no blank content, and a
  * guaranteed leading user turn (the API rejects assistant-first arrays, and a
  * brief-opened conversation starts with an assistant message).
  */
@@ -49,7 +49,7 @@ export function toApiMessages(
   userMessage: string
 ): Array<{ role: 'user' | 'assistant'; content: string }> {
   const trimmed = history
-    .slice(-10)
+    .slice(-40)
     .filter(m => m.content.trim().length > 0)
     .map(m => ({ role: m.role, content: m.content }))
 
@@ -58,4 +58,19 @@ export function toApiMessages(
   }
 
   return [...trimmed, { role: 'user', content: userMessage }]
+}
+
+/**
+ * Whether a conversation has earned an LLM-generated title: it has none yet and
+ * at least one non-empty message from each side (the first real exchange is
+ * complete). Brief-seeded threads stay untitled until the user actually replies.
+ */
+export function shouldGenerateTitle(
+  messages: ChatMessage[],
+  title: string | null
+): boolean {
+  if (title && title.trim().length > 0) return false
+  const hasUser = messages.some(m => m.role === 'user' && m.content.trim().length > 0)
+  const hasAssistant = messages.some(m => m.role === 'assistant' && m.content.trim().length > 0)
+  return hasUser && hasAssistant
 }

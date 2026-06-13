@@ -70,3 +70,19 @@ export interface ConversationState {
   recent_messages: ChatMessage[]
   updated_at: string
 }
+
+export interface Conversation {
+  id: string
+  title: string | null
+  messages: ChatMessage[]
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationSummary {
+  id: string
+  title: string | null
+  created_at: string
+  updated_at: string
+  lastSnippet: string
+}

@@ -1,7 +1,8 @@
 import { supabase, supabaseServer } from './supabase'
 import { localDate, addDays } from './utils'
 import { filterByMatch } from './appEdit'
-import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState, Tracker } from './types'
+import { stripTags } from './advisorParse'
+import type { Goal, DailyTask, DailyLog, CalendarMark, ConversationState, Conversation, ConversationSummary, ChatMessage, Tracker } from './types'
 
 function db() {
   if (typeof window === 'undefined' && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -357,4 +358,70 @@ export async function upsertConversationState(
     .from('conversation_state')
     .upsert({ id: 1, ...state, updated_at: new Date().toISOString() })
   if (error) throw error
+}
+
+export async function listConversations(): Promise<ConversationSummary[]> {
+  const { data } = await db()
+    .from('conversations')
+    .select('id,title,messages,created_at,updated_at')
+    .order('updated_at', { ascending: false })
+  return (data ?? []).map(row => {
+    const msgs = (row.messages as ChatMessage[]) ?? []
+    const last = msgs[msgs.length - 1]
+    return {
+      id: row.id as string,
+      title: (row.title as string | null) ?? null,
+      created_at: row.created_at as string,
+      updated_at: row.updated_at as string,
+      lastSnippet: last ? stripTags(last.content).trim().slice(0, 80) : '',
+    }
+  })
+}
+
+export async function getConversation(id: string): Promise<Conversation | null> {
+  const { data } = await db().from('conversations').select('*').eq('id', id).single()
+  return (data as Conversation) ?? null
+}
+
+export async function createConversation(seed: ChatMessage[] = []): Promise<Conversation> {
+  const { data, error } = await db()
+    .from('conversations')
+    .insert({ messages: seed })
+    .select()
+    .single()
+  if (error) throw error
+  return data as Conversation
+}
+
+// Re-reads before writing so a concurrent append (e.g. a brief landing in the
+// same row) isn't clobbered, mirroring the old single-row write discipline.
+export async function appendMessages(id: string, msgs: ChatMessage[]): Promise<void> {
+  const { data } = await db().from('conversations').select('messages').eq('id', id).single()
+  const existing = (data?.messages as ChatMessage[]) ?? []
+  const { error } = await db()
+    .from('conversations')
+    .update({ messages: [...existing, ...msgs], updated_at: new Date().toISOString() })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function setConversationTitle(id: string, title: string): Promise<void> {
+  const { error } = await db().from('conversations').update({ title }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteConversation(id: string): Promise<void> {
+  const { error } = await db().from('conversations').delete().eq('id', id)
+  if (error) throw error
+}
+
+// Flattened, ts-sorted message list across all conversations — the brief gate
+// (needsBrief) only inspects the latest brief and any activity "this evening",
+// both of which survive flattening once sorted chronologically.
+export async function getAllConversationMessages(): Promise<ChatMessage[]> {
+  const { data } = await db().from('conversations').select('messages')
+  const all = (data ?? []).flatMap(r => (r.messages as ChatMessage[]) ?? [])
+  return all.sort((a, b) =>
+    (a.ts ?? '') < (b.ts ?? '') ? -1 : (a.ts ?? '') > (b.ts ?? '') ? 1 : 0
+  )
 }

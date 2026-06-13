@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { needsBrief, toApiMessages } from './conversation'
+import { needsBrief, toApiMessages, shouldGenerateTitle } from './conversation'
 import { etHour } from './utils'
 import type { ChatMessage } from './types'
 
@@ -120,14 +120,14 @@ describe('toApiMessages', () => {
     }
   })
 
-  it('caps history at the last 10 messages', () => {
-    const history: ChatMessage[] = Array.from({ length: 30 }, (_, i) =>
+  it('caps history at the last 40 messages', () => {
+    const history: ChatMessage[] = Array.from({ length: 100 }, (_, i) =>
       i % 2 === 0 ? userMsg(`u${i}`) : { role: 'assistant' as const, content: `a${i}` }
     )
     const result = toApiMessages(history, 'latest')
-    // 10 history + 1 new user message
-    expect(result).toHaveLength(11)
-    expect(result[0].content).toBe('u20')
+    // 40 history + 1 new user message
+    expect(result).toHaveLength(41)
+    expect(result[0].content).toBe('u60')
   })
 
   it('drops empty messages so the API never sees blank content', () => {
@@ -145,5 +145,35 @@ describe('toApiMessages', () => {
     expect(toApiMessages([], 'first message')).toEqual([
       { role: 'user', content: 'first message' },
     ])
+  })
+})
+
+describe('shouldGenerateTitle', () => {
+  it('returns false when a non-empty title already exists', () => {
+    const messages: ChatMessage[] = [userMsg('hi'), { role: 'assistant', content: 'hey' }]
+    expect(shouldGenerateTitle(messages, 'Existing title')).toBe(false)
+  })
+
+  it('returns true after the first user→assistant exchange', () => {
+    const messages: ChatMessage[] = [userMsg('hi'), { role: 'assistant', content: 'hey' }]
+    expect(shouldGenerateTitle(messages, null)).toBe(true)
+  })
+
+  it('returns false for a brief-only thread with no user reply yet', () => {
+    expect(shouldGenerateTitle([brief('2026-06-07T13:00:00Z')], null)).toBe(false)
+  })
+
+  it('returns true for a brief thread once the user has replied', () => {
+    const messages: ChatMessage[] = [
+      brief('2026-06-07T13:00:00Z'),
+      userMsg('went well'),
+      { role: 'assistant', content: 'nice work' },
+    ]
+    expect(shouldGenerateTitle(messages, null)).toBe(true)
+  })
+
+  it('ignores empty-content messages', () => {
+    const messages: ChatMessage[] = [userMsg('hi'), { role: 'assistant', content: '' }]
+    expect(shouldGenerateTitle(messages, null)).toBe(false)
   })
 })

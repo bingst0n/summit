@@ -1,5 +1,5 @@
 -- Run this in the Supabase SQL editor for a fresh project.
--- Reflects the live v2 schema (color, completed, calendar_marks, conversation_state).
+-- Reflects the live v2 schema (color, completed, calendar_marks, conversations).
 
 create table goals (
   id uuid primary key default gen_random_uuid(),
@@ -37,13 +37,17 @@ create table calendar_marks (
   created_at timestamptz default now()
 );
 
--- Single-row advisor conversation memory (always upserted on id = 1).
-create table conversation_state (
-  id integer primary key default 1,
-  summary text not null default '',
-  recent_messages jsonb not null default '[]',
+-- Advisor conversations — one row per ChatGPT-style thread (no rolling summary;
+-- conversations are isolated, the advisor re-reads goal/task/log state each turn).
+create table conversations (
+  id uuid primary key default gen_random_uuid(),
+  title text,
+  messages jsonb not null default '[]',
+  created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
+
+create index conversations_updated_at_idx on conversations (updated_at desc);
 
 -- Fine-grained per-goal progress: steps (position in an ordered series) and
 -- counters (numeric value toward a target). Edited in the UI and by the advisor.
@@ -65,5 +69,5 @@ alter table goals disable row level security;
 alter table daily_tasks disable row level security;
 alter table daily_logs disable row level security;
 alter table calendar_marks disable row level security;
-alter table conversation_state disable row level security;
+alter table conversations disable row level security;
 alter table trackers disable row level security;
