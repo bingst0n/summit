@@ -6,9 +6,11 @@ import {
   getLogsForDate,
   getRecentLogs,
   getLightDays,
-  getConversationState,
-  upsertConversationState,
   getTrackers,
+  getAllConversationMessages,
+  createConversation,
+  appendMessages,
+  deleteConversation,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
 import { needsBrief } from '@/lib/conversation'
@@ -20,15 +22,16 @@ export const maxDuration = 30
 export async function GET() {
   const date = today()
 
-  // Cheap gate first: most opens don't need a brief at all, so don't pay for
-  // the full context fetch (let alone the LLM call) until we know we do.
-  const [state, todayLogs] = await Promise.all([
-    getConversationState(),
+  // Cheap gate first: most opens don't need a brief, so don't pay for context
+  // (let alone the LLM call) until we know we do. The gate scans brief/activity
+  // signals flattened across all conversations.
+  const [briefMessages, todayLogs] = await Promise.all([
+    getAllConversationMessages(),
     getLogsForDate(date),
   ])
   const loggedToday = todayLogs.length > 0
 
-  if (!needsBrief(state.recent_messages, { loggedToday })) {
+  if (!needsBrief(briefMessages, { loggedToday })) {
     return new Response(null, { status: 204 })
   }
 
@@ -68,16 +71,7 @@ export async function GET() {
         return `${l.date} (${goal?.title ?? 'unknown'}): ${l.notes}`
       }).join('\n')
 
-  const lightDaySummary = lightDays.length === 0
-    ? 'None.'
-    : lightDays.join(', ')
-
-  const recentConversation = state.recent_messages.length === 0
-    ? 'None yet — this is your first message to the user.'
-    : state.recent_messages
-        .slice(-6)
-        .map(m => `${m.role === 'assistant' ? 'You' : 'User'}: ${m.content}`)
-        .join('\n\n')
+  const lightDaySummary = lightDays.length === 0 ? 'None.' : lightDays.join(', ')
 
   const systemPrompt = ADVISOR_BRIEF_SYSTEM({
     date,
@@ -88,9 +82,11 @@ export async function GET() {
     loggedToday,
     recentLogs: logsSummary,
     lightDays: lightDaySummary,
-    summary: state.summary,
-    recentConversation,
   })
+
+  // Create the thread up front so its id can ride the response header before the
+  // body streams. If the stream produces nothing, delete the empty thread.
+  const convo = await createConversation()
 
   let fullText = ''
 
@@ -106,10 +102,7 @@ export async function GET() {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            if (
-              chunk.type === 'content_block_delta' &&
-              chunk.delta.type === 'text_delta'
-            ) {
+            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
               const text = chunk.delta.text
               fullText += text
               controller.enqueue(new TextEncoder().encode(text))
@@ -121,31 +114,30 @@ export async function GET() {
           try { controller.error(err) } catch { /* already errored */ }
         }
 
-        if (!fullText) return
+        if (!fullText) {
+          // Nothing streamed — don't leave an empty thread in the history list.
+          try { await deleteConversation(convo.id) } catch { /* best-effort */ }
+          return
+        }
 
-        // Append the brief to the conversation in chronological order.
-        // Re-read state right before writing: generation took seconds, and a
-        // concurrent request (double-mount, second device) may have persisted
-        // a brief already — in that case drop this one instead of stacking.
         try {
-          const fresh = await getConversationState()
-          if (!needsBrief(fresh.recent_messages, { loggedToday })) return
-
           const briefMessage: ChatMessage = {
             role: 'assistant',
             content: fullText,
             kind: 'brief',
             ts: new Date().toISOString(),
           }
-          await upsertConversationState({
-            summary: fresh.summary,
-            recent_messages: [...fresh.recent_messages, briefMessage].slice(-20),
-          })
+          await appendMessages(convo.id, [briefMessage])
         } catch (err) {
-          console.error('Failed to persist brief to conversation state:', err)
+          console.error('Failed to persist brief:', err)
         }
       },
     }),
-    { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Conversation-Id': convo.id,
+      },
+    }
   )
 }
