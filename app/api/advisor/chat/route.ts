@@ -1,43 +1,49 @@
 import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/claude'
-import {
-  ADVISOR_SYSTEM,
-  COMPRESSION_SYSTEM,
-} from '@/lib/prompts'
+import { ADVISOR_SYSTEM, TITLE_SYSTEM } from '@/lib/prompts'
 import {
   getGoals,
   getTodayTasks,
   getRecentLogs,
   getLightDays,
-  getConversationState,
-  upsertConversationState,
   getTrackers,
   getTasksInRange,
+  getConversation,
+  createConversation,
+  appendMessages,
+  setConversationTitle,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
-import { toApiMessages } from '@/lib/conversation'
+import { toApiMessages, shouldGenerateTitle } from '@/lib/conversation'
 import { buildTrackersSummary } from '@/lib/tracker'
 import { buildUpcomingSummary } from '@/lib/appEdit'
 import { extractFirstUrl, fetchPageText } from '@/lib/fetchPage'
+import { stripTags } from '@/lib/advisorParse'
 import type { ChatMessage } from '@/lib/types'
 
 export const maxDuration = 60
 
-export async function GET() {
-  try {
-    const state = await getConversationState()
-    return NextResponse.json({ messages: state.recent_messages })
-  } catch (err) {
-    console.error('Advisor history error:', err)
-    return NextResponse.json({ messages: [] })
-  }
+// Compact transcript of the first exchange, fed to Haiku for title generation.
+function titleInput(messages: ChatMessage[]): string {
+  const firstUser = messages.find(m => m.role === 'user' && m.content.trim())
+  const firstAssistant = messages.find(
+    m => m.role === 'assistant' && m.kind !== 'brief' && m.content.trim()
+  )
+  return [
+    firstUser && `User: ${firstUser.content.trim()}`,
+    firstAssistant && `Advisor: ${stripTags(firstAssistant.content).trim()}`,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
 }
 
 export async function POST(req: Request) {
   let message: string
+  let conversationId: string | null
   try {
     const body = await req.json()
     message = body.message
+    conversationId = typeof body.conversationId === 'string' ? body.conversationId : null
   } catch {
     return NextResponse.json({ error: 'invalid request body' }, { status: 400 })
   }
@@ -45,6 +51,12 @@ export async function POST(req: Request) {
   if (!message || typeof message !== 'string') {
     return NextResponse.json({ error: 'message required' }, { status: 400 })
   }
+
+  // Load the target thread, or lazily create one (first message of a new chat).
+  let convo = conversationId ? await getConversation(conversationId) : null
+  if (!convo) convo = await createConversation()
+  const convoId = convo.id
+  const history = convo.messages
 
   const date = today()
   const time = new Date().toLocaleTimeString('en-US', {
@@ -55,12 +67,11 @@ export async function POST(req: Request) {
   })
   const horizonStr = localDate(30)
 
-  const [goals, todayTasks, recentLogs, lightDays, state, trackers, upcomingTasks] = await Promise.all([
+  const [goals, todayTasks, recentLogs, lightDays, trackers, upcomingTasks] = await Promise.all([
     getGoals(),
     getTodayTasks(date),
     getRecentLogs(7),
     getLightDays(date, horizonStr),
-    getConversationState(),
     getTrackers(),
     getTasksInRange(localDate(1), localDate(14)),
   ])
@@ -86,9 +97,7 @@ export async function POST(req: Request) {
         return `${l.date} (${goal?.title ?? 'unknown'}): ${l.notes}`
       }).join('\n')
 
-  const lightDaySummary = lightDays.length === 0
-    ? 'None.'
-    : lightDays.join(', ')
+  const lightDaySummary = lightDays.length === 0 ? 'None.' : lightDays.join(', ')
 
   const systemPrompt = ADVISOR_SYSTEM({
     date,
@@ -99,12 +108,11 @@ export async function POST(req: Request) {
     upcoming: upcomingSummary,
     recentLogs: logsSummary,
     lightDays: lightDaySummary,
-    summary: state.summary,
   })
 
   // If the user pasted a link, fetch it now and show the page text to the model
-  // only — the persisted conversation keeps the message as typed, so page dumps
-  // never bloat conversation_state or the compression loop.
+  // only — the persisted message keeps the text as typed, so page dumps never
+  // bloat the stored conversation.
   let modelMessage = message
   const url = extractFirstUrl(message)
   if (url) {
@@ -114,7 +122,7 @@ export async function POST(req: Request) {
       : `${message}\n\n<fetched_page url="${url}" error="${page.error.replace(/"/g, '&quot;')}"></fetched_page>`
   }
 
-  const messagesForApi = toApiMessages(state.recent_messages, modelMessage)
+  const messagesForApi = toApiMessages(history, modelMessage)
 
   const stream = anthropic.messages.stream({
     model: 'claude-sonnet-4-6',
@@ -130,10 +138,7 @@ export async function POST(req: Request) {
       async start(controller) {
         try {
           for await (const chunk of stream) {
-            if (
-              chunk.type === 'content_block_delta' &&
-              chunk.delta.type === 'text_delta'
-            ) {
+            if (chunk.type === 'content_block_delta' && chunk.delta.type === 'text_delta') {
               const text = chunk.delta.text
               fullResponse += text
               controller.enqueue(new TextEncoder().encode(text))
@@ -145,71 +150,44 @@ export async function POST(req: Request) {
           try { controller.error(err) } catch { /* already errored */ }
         }
 
-        // Don't persist an empty turn (stream died before producing any text).
+        // Don't persist an empty turn (stream died before any text).
         if (!fullResponse) return
 
-        // Persist whatever streamed (even a partial response) so the turn
-        // isn't lost if the stream errored midway. Re-read state right before
-        // writing: generation took seconds, and the brief route may have
-        // appended in the meantime — persisting from the pre-stream snapshot
-        // would silently clobber it.
         try {
-          const fresh = await getConversationState()
           const ts = new Date().toISOString()
-          const updatedMessages: ChatMessage[] = [
-            ...fresh.recent_messages,
+          await appendMessages(convoId, [
             { role: 'user', content: message, ts },
             { role: 'assistant', content: fullResponse, ts },
-          ]
+          ])
 
-          if (updatedMessages.length <= 20) {
-            await upsertConversationState({
-              summary: fresh.summary,
-              recent_messages: updatedMessages,
-            })
-            return
-          }
-
-          // Compress oldest 10 into summary
-          const toCompress = updatedMessages.slice(0, 10)
-          const remaining = updatedMessages.slice(10)
-
-          const compressionText = toCompress
-            .map(m => `${m.role}: ${m.content}`)
-            .join('\n\n')
-
-          try {
-            const compressionMsg = await anthropic.messages.create({
-              model: 'claude-haiku-4-5-20251001',
-              max_tokens: 256,
-              system: COMPRESSION_SYSTEM,
-              messages: [{ role: 'user', content: compressionText }],
-            })
-            const newSummaryChunk =
-              compressionMsg.content[0].type === 'text'
-                ? compressionMsg.content[0].text
-                : ''
-
-            const combinedSummary = fresh.summary
-              ? `${fresh.summary}\n\n${newSummaryChunk}`
-              : newSummaryChunk
-
-            await upsertConversationState({
-              summary: combinedSummary,
-              recent_messages: remaining,
-            })
-          } catch {
-            // Compression failed — save without compressing
-            await upsertConversationState({
-              summary: fresh.summary,
-              recent_messages: updatedMessages.slice(-20),
-            })
+          // Title the thread once its first real exchange exists. Best-effort:
+          // a failure leaves title null and the UI falls back to a date label.
+          const after = await getConversation(convoId)
+          if (after && shouldGenerateTitle(after.messages, after.title)) {
+            try {
+              const titleMsg = await anthropic.messages.create({
+                model: 'claude-haiku-4-5-20251001',
+                max_tokens: 24,
+                system: TITLE_SYSTEM,
+                messages: [{ role: 'user', content: titleInput(after.messages) }],
+              })
+              const title =
+                titleMsg.content[0].type === 'text' ? titleMsg.content[0].text.trim() : ''
+              if (title) await setConversationTitle(convoId, title)
+            } catch (err) {
+              console.error('Title generation failed:', err)
+            }
           }
         } catch (err) {
-          console.error('Failed to persist conversation state:', err)
+          console.error('Failed to persist conversation:', err)
         }
       },
     }),
-    { headers: { 'Content-Type': 'text/plain; charset=utf-8' } }
+    {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+        'X-Conversation-Id': convoId,
+      },
+    }
   )
 }

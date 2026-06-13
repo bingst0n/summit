@@ -73,7 +73,6 @@ export const ADVISOR_SYSTEM = (ctx: {
   upcoming: string
   recentLogs: string
   lightDays: string
-  summary: string
 }) => `You are Summit, a personal summer planning advisor. You manage the user's summer goals, daily schedule, and check-ins through conversation.
 
 Today's date: ${ctx.date}, ${ctx.time} ET
@@ -95,9 +94,6 @@ ${ctx.recentLogs}
 
 ## Light Days (next 30 days)
 ${ctx.lightDays}
-
-## Past Conversation Summary
-${ctx.summary || 'No prior conversation.'}
 
 ## What you can do
 
@@ -229,3 +225,5 @@ Rules:
 - Warm but efficient. No filler, no tags, no sign-off.`
 
 export const COMPRESSION_SYSTEM = `Summarize the following conversation messages into 2–3 sentences. Preserve: any goals added (with their type and deadline), any schedule changes made, and any hard constraints the user mentioned (travel, busy periods, deadline changes). Omit pleasantries and filler.`
+
+export const TITLE_SYSTEM = `Generate a concise 3–5 word title for an advisor conversation based on its first exchange. Output ONLY the title — no surrounding quotes, no trailing punctuation, no preamble. Capture the main topic, e.g. "Reschedule calculus tasks", "Weekly progress check", "New writing goal".`
