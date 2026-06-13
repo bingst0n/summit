@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { anthropic } from '@/lib/claude'
 import { SCHEDULE_GENERATION_SYSTEM } from '@/lib/prompts'
 import { createGoal, createDailyTasks, getGoals } from '@/lib/db'
-import { today as etToday, localDate } from '@/lib/utils'
+import { today as etToday, localDate, SEASON } from '@/lib/utils'
 
 export const maxDuration = 60
 
@@ -47,14 +47,16 @@ export async function POST(req: Request) {
 
   // ET, not UTC — toISOString() rolls over to "tomorrow" after ~8 PM ET, which
   // would make the generated schedule skip today.
+  // Never schedule before the season starts — goals created pre-season begin on Day 1.
   const today = etToday()
+  const startDate = today < SEASON.start ? SEASON.start : today
   const horizonStr = localDate(30)
   const scheduleEnd = goalData.deadline < horizonStr ? goalData.deadline : horizonStr
 
   const userPrompt = `Goal: ${goalData.title}
 Description: ${goalData.description ?? ''}
 Schedule through: ${scheduleEnd}
-Start date: ${today}`
+Start date: ${startDate}`
 
   const message = await anthropic.messages.create({
     model: 'claude-haiku-4-5-20251001',

@@ -12,10 +12,12 @@ import {
   getConversationState,
   upsertConversationState,
   getTrackers,
+  getTasksInRange,
 } from '@/lib/db'
 import { today, localDate } from '@/lib/utils'
 import { toApiMessages } from '@/lib/conversation'
 import { buildTrackersSummary } from '@/lib/tracker'
+import { buildUpcomingSummary } from '@/lib/appEdit'
 import { extractFirstUrl, fetchPageText } from '@/lib/fetchPage'
 import type { ChatMessage } from '@/lib/types'
 
@@ -53,13 +55,14 @@ export async function POST(req: Request) {
   })
   const horizonStr = localDate(30)
 
-  const [goals, todayTasks, recentLogs, lightDays, state, trackers] = await Promise.all([
+  const [goals, todayTasks, recentLogs, lightDays, state, trackers, upcomingTasks] = await Promise.all([
     getGoals(),
     getTodayTasks(date),
     getRecentLogs(7),
     getLightDays(date, horizonStr),
     getConversationState(),
     getTrackers(),
+    getTasksInRange(localDate(1), localDate(14)),
   ])
 
   const goalsSummary = goals.length === 0
@@ -67,6 +70,7 @@ export async function POST(req: Request) {
     : goals.map(g => `- [id:${g.id}] ${g.title} (${g.type}, due ${g.deadline})`).join('\n')
 
   const trackersSummary = buildTrackersSummary(goals, trackers)
+  const upcomingSummary = buildUpcomingSummary(goals, upcomingTasks)
 
   const tasksSummary = todayTasks.length === 0
     ? 'No tasks scheduled today.'
@@ -92,6 +96,7 @@ export async function POST(req: Request) {
     goals: goalsSummary,
     trackers: trackersSummary,
     todayTasks: tasksSummary,
+    upcoming: upcomingSummary,
     recentLogs: logsSummary,
     lightDays: lightDaySummary,
     summary: state.summary,
