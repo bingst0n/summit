@@ -10,6 +10,7 @@ import {
   extractTrackerCreate,
   extractTrackerUpdate,
   extractTrackerDelete,
+  extractAppEdit,
   stripTags,
   type CheckInEntry,
   type ParsedTrackerUpdate,
@@ -28,6 +29,8 @@ export default function AdvisorChat() {
   const [saveError, setSaveError] = useState<string | null>(null)
   const [trackerSaving, setTrackerSaving] = useState(false)
   const [trackerError, setTrackerError] = useState<string | null>(null)
+  const [appEditApplying, setAppEditApplying] = useState(false)
+  const [appEditError, setAppEditError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [scheduleStatus, setScheduleStatus] = useState<'idle' | 'updating' | 'updated' | 'error'>('idle')
   const lastCheckInRef = useRef<CheckInEntry[] | null>(null)
@@ -121,6 +124,7 @@ export default function AdvisorChat() {
   const pendingDeleteGoal = extractDeleteGoal(lastAssistantContent)
   const pendingTrackerCreate = extractTrackerCreate(lastAssistantContent)
   const pendingTrackerDelete = extractTrackerDelete(lastAssistantContent)
+  const pendingAppEdit = extractAppEdit(lastAssistantContent)
 
   // Tracker positions must be persisted before /api/adjust runs so the
   // adjustment LLM redistributes from the fresh position, not the stale one.
@@ -151,6 +155,31 @@ export default function AdvisorChat() {
         body: JSON.stringify({ date: today(), logs: checkIn }),
       })
       if (!res.ok) throw new Error(`checkin ${res.status}`)
+
+      // Recap said these goals' planned work is finished — check today's tasks
+      // off before adjustment runs, so redistribution sees the truth.
+      const doneGoals = checkIn.filter(c => c.done).map(c => c.goal_id)
+      if (doneGoals.length > 0) {
+        try {
+          const tasksRes = await fetch(`/api/tasks?start=${today()}&end=${today()}`)
+          const { tasks } = await tasksRes.json()
+          const targets = (tasks ?? []).filter(
+            (t: { id: string; goal_id: string; completed: boolean }) =>
+              doneGoals.includes(t.goal_id) && !t.completed
+          )
+          await Promise.allSettled(
+            targets.map((t: { id: string }) =>
+              fetch(`/api/tasks/${t.id}/complete`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ completed: true }),
+              })
+            )
+          )
+        } catch {
+          // Best-effort: the log is already saved; check-off failure must not block adjustment.
+        }
+      }
 
       const goalIds = [...new Set(checkIn.map(c => c.goal_id))]
       // allSettled: one goal's adjustment failing shouldn't abort the others.
@@ -308,6 +337,40 @@ export default function AdvisorChat() {
     }
   }
 
+  async function applyAppEdit() {
+    if (!pendingAppEdit) return
+    setAppEditApplying(true)
+    setAppEditError(null)
+    try {
+      const res = await fetch('/api/app-edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ops: pendingAppEdit.ops }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? `Server error ${res.status}`)
+      }
+      const { results, applied, failed } = await res.json()
+      router.refresh()
+      const firstFail = (results as Array<{ ok: boolean; detail: string }> | undefined)?.find(r => !r.ok)
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content:
+            failed === 0
+              ? `✓ Applied ${applied} change${applied === 1 ? '' : 's'}.`
+              : `Applied ${applied} of ${applied + failed} change${applied + failed === 1 ? '' : 's'} — ${firstFail?.detail ?? 'some changes failed'}`,
+        },
+      ])
+    } catch (err) {
+      setAppEditError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setAppEditApplying(false)
+    }
+  }
+
   if (saving) {
     const label = progress < 15
       ? 'Saving goal...'
@@ -432,6 +495,25 @@ export default function AdvisorChat() {
               className="bg-[#e5484d] hover:brightness-110 active:brightness-90 text-white font-semibold px-8 py-3 rounded-2xl transition-colors"
             >
               Delete tracker &quot;{pendingTrackerDelete.name}&quot;
+            </button>
+          </div>
+        )}
+
+        {/* Apply app-edit button */}
+        {pendingAppEdit && !streaming && (
+          <div className="flex flex-col items-center gap-2 pt-2">
+            <p className="text-mut text-xs text-center max-w-[300px]">{pendingAppEdit.summary}</p>
+            {appEditError && <p className="text-warn text-xs text-center">{appEditError}</p>}
+            <button
+              onClick={applyAppEdit}
+              disabled={appEditApplying}
+              className="bg-moss hover:brightness-110 active:brightness-90 disabled:opacity-50 text-moss-ink font-semibold px-8 py-3 rounded-2xl transition-colors"
+            >
+              {appEditApplying
+                ? 'Applying…'
+                : appEditError
+                  ? 'Retry'
+                  : `Apply ${pendingAppEdit.ops.length} change${pendingAppEdit.ops.length === 1 ? '' : 's'} ✓`}
             </button>
           </div>
         )}
