@@ -16,6 +16,8 @@ import {
   type ParsedTrackerUpdate,
 } from '@/lib/advisorParse'
 import { today } from '@/lib/utils'
+import ConversationDrawer, { type ConvSummary } from '@/components/ConversationDrawer'
+import type { ChatMessage } from '@/lib/types'
 
 type Message = { role: 'user' | 'assistant'; content: string }
 
@@ -33,70 +35,103 @@ export default function AdvisorChat() {
   const [appEditError, setAppEditError] = useState<string | null>(null)
   const [progress, setProgress] = useState(0)
   const [scheduleStatus, setScheduleStatus] = useState<'idle' | 'updating' | 'updated' | 'error'>('idle')
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<ConvSummary[]>([])
+  const [title, setTitle] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const lastCheckInRef = useRef<CheckInEntry[] | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // History renders immediately (plain DB read); the brief — if the server
-  // decides one is due — streams in afterwards as a new bubble.
+  const refreshConversations = useCallback(async (): Promise<ConvSummary[]> => {
+    try {
+      const res = await fetch('/api/advisor/conversations')
+      const data = await res.json()
+      const list: ConvSummary[] = data.conversations ?? []
+      setConversations(list)
+      return list
+    } catch {
+      return []
+    }
+  }, [])
+
+  // Mount: fetch the conversation list and check for a daily brief. A brief
+  // opens (and lands us on) a fresh dated thread; otherwise we resume the most
+  // recent thread, or present an empty new one.
   useEffect(() => {
     let cancelled = false
 
     async function load() {
-      let history: Message[] = []
-      try {
-        const res = await fetch('/api/advisor/chat')
-        const data = await res.json()
-        history = data.messages ?? []
-      } catch { /* show empty history; the brief may still arrive */ }
-      if (cancelled) return
-      setMessages(history)
-      setHistoryLoaded(true)
+      const listPromise = fetch('/api/advisor/conversations')
+        .then(r => r.json())
+        .catch(() => ({ conversations: [] }))
 
-      let briefText = ''
+      let briefRes: Response | null = null
       try {
-        const res = await fetch('/api/advisor/brief')
-        // 204 = the advisor has nothing new to say; just resume the conversation.
-        if (res.status === 204 || !res.ok || !res.body) return
-        if (cancelled) return
-
-        setStreaming(true)
-        setMessages(prev => [...prev, { role: 'assistant', content: '' }])
-        const reader = res.body.getReader()
-        const decoder = new TextDecoder()
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          if (cancelled) return
-          briefText += decoder.decode(value, { stream: true })
-          setMessages(prev => [...prev.slice(0, -1), { role: 'assistant', content: briefText }])
-        }
-        // Stream produced nothing — drop the empty placeholder bubble.
-        if (!briefText) setMessages(prev => prev.slice(0, -1))
+        briefRes = await fetch('/api/advisor/brief')
       } catch {
-        if (cancelled) return
-        if (briefText) return // partial brief already rendered; leave it
-        setMessages(prev => {
-          const withoutPlaceholder =
-            prev[prev.length - 1]?.role === 'assistant' && prev[prev.length - 1]?.content === ''
-              ? prev.slice(0, -1)
-              : prev
-          return withoutPlaceholder.length === 0
-            ? [{ role: 'assistant', content: "Hey! What's on your mind?" }]
-            : withoutPlaceholder
-        })
-      } finally {
-        if (!cancelled) setStreaming(false)
+        briefRes = null
+      }
+
+      const listData = await listPromise
+      if (cancelled) return
+      const list: ConvSummary[] = listData.conversations ?? []
+      setConversations(list)
+
+      if (briefRes && briefRes.status !== 204 && briefRes.ok && briefRes.body) {
+        const newId = briefRes.headers.get('X-Conversation-Id')
+        setConversationId(newId)
+        setTitle(null)
+        setHistoryLoaded(true)
+        setStreaming(true)
+        setMessages([{ role: 'assistant', content: '' }])
+
+        let briefText = ''
+        try {
+          const reader = briefRes.body.getReader()
+          const decoder = new TextDecoder()
+          while (true) {
+            const { done, value } = await reader.read()
+            if (done) break
+            if (cancelled) return
+            briefText += decoder.decode(value, { stream: true })
+            setMessages([{ role: 'assistant', content: briefText }])
+          }
+        } catch {
+          /* leave whatever streamed */
+        }
+        if (!cancelled) {
+          if (!briefText) setMessages([])
+          setStreaming(false)
+          refreshConversations()
+        }
+        return
+      }
+
+      // No brief due: resume most recent, or start fresh.
+      setHistoryLoaded(true)
+      if (list.length > 0) {
+        try {
+          const res = await fetch(`/api/advisor/conversations/${list[0].id}`)
+          if (!cancelled && res.ok) {
+            const data = await res.json()
+            setConversationId(data.id)
+            setTitle(data.title ?? null)
+            setMessages((data.messages ?? []).map((m: ChatMessage) => ({ role: m.role, content: m.content })))
+          }
+        } catch {
+          /* fall through to empty */
+        }
+      } else if (!cancelled) {
+        setMessages([{ role: 'assistant', content: "Hey! What's on your mind?" }])
       }
     }
 
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [refreshConversations])
 
   useEffect(() => {
-    // Instant during streaming so each token doesn't restart a smooth-scroll
-    // animation (which fights the user and looks janky); smooth otherwise.
     bottomRef.current?.scrollIntoView({ behavior: streaming ? 'auto' : 'smooth' })
   }, [messages, streaming])
 
@@ -126,8 +161,45 @@ export default function AdvisorChat() {
   const pendingTrackerDelete = extractTrackerDelete(lastAssistantContent)
   const pendingAppEdit = extractAppEdit(lastAssistantContent)
 
-  // Tracker positions must be persisted before /api/adjust runs so the
-  // adjustment LLM redistributes from the fresh position, not the stale one.
+  function startNewConversation() {
+    setDrawerOpen(false)
+    setStreaming(false)
+    setConversationId(null)
+    setTitle(null)
+    setMessages([])
+    setInput('')
+  }
+
+  async function openConversation(id: string) {
+    setDrawerOpen(false)
+    if (id === conversationId) return
+    setStreaming(false)
+    try {
+      const res = await fetch(`/api/advisor/conversations/${id}`)
+      if (!res.ok) return
+      const data = await res.json()
+      setConversationId(data.id)
+      setTitle(data.title ?? null)
+      setMessages((data.messages ?? []).map((m: ChatMessage) => ({ role: m.role, content: m.content })))
+    } catch {
+      /* keep current view on failure */
+    }
+  }
+
+  async function deleteConversation(id: string) {
+    if (!window.confirm('Delete this conversation?')) return
+    try {
+      await fetch(`/api/advisor/conversations/${id}`, { method: 'DELETE' })
+    } catch {
+      /* best-effort; refresh below reflects truth */
+    }
+    const list = await refreshConversations()
+    if (id === conversationId) {
+      if (list.length > 0) openConversation(list[0].id)
+      else startNewConversation()
+    }
+  }
+
   async function runTrackerUpdates(updates: ParsedTrackerUpdate[]) {
     const results = await Promise.allSettled(
       updates.map(u =>
@@ -156,8 +228,6 @@ export default function AdvisorChat() {
       })
       if (!res.ok) throw new Error(`checkin ${res.status}`)
 
-      // Recap said these goals' planned work is finished — check today's tasks
-      // off before adjustment runs, so redistribution sees the truth.
       const doneGoals = checkIn.filter(c => c.done).map(c => c.goal_id)
       if (doneGoals.length > 0) {
         try {
@@ -177,13 +247,11 @@ export default function AdvisorChat() {
             )
           )
         } catch {
-          // Best-effort: the log is already saved; check-off failure must not block adjustment.
+          /* best-effort: the log is saved; check-off failure must not block adjustment. */
         }
       }
 
       const goalIds = [...new Set(checkIn.map(c => c.goal_id))]
-      // allSettled: one goal's adjustment failing shouldn't abort the others.
-      // The log is already saved, so the retry button can safely re-run this.
       const results = await Promise.allSettled(
         goalIds.map(id =>
           fetch('/api/adjust', {
@@ -218,13 +286,21 @@ export default function AdvisorChat() {
 
     let text = ''
     let ok = false
+    let activeId = conversationId
     try {
       const res = await fetch('/api/advisor/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText }),
+        body: JSON.stringify({ conversationId, message: userText }),
       })
       if (!res.ok || !res.body) throw new Error(`chat ${res.status}`)
+
+      // The server lazily creates the thread for a brand-new chat; capture its id.
+      const newId = res.headers.get('X-Conversation-Id')
+      if (newId) {
+        activeId = newId
+        if (!conversationId) setConversationId(newId)
+      }
 
       const reader = res.body.getReader()
       const decoder = new TextDecoder()
@@ -236,8 +312,6 @@ export default function AdvisorChat() {
       }
       ok = true
     } catch {
-      // Replace the empty placeholder bubble with an error so the input doesn't
-      // stay disabled forever (finally re-enables it).
       setMessages(prev => [
         ...prev.slice(0, -1),
         { role: 'assistant', content: text || "⚠️ Couldn't reach the advisor. Tap Send to try again." },
@@ -252,6 +326,13 @@ export default function AdvisorChat() {
       const checkIn = extractCheckIn(text)
       if (checkIn) runCheckIn(checkIn)
       else if (trackerUpdates) router.refresh()
+
+      // Refresh the list so the new/updated thread (and any freshly generated
+      // title) appears; sync the title bar for the active thread.
+      refreshConversations().then(list => {
+        const found = list.find(c => c.id === activeId)
+        if (found) setTitle(found.title)
+      })
     }
   }
 
@@ -398,8 +479,38 @@ export default function AdvisorChat() {
 
   return (
     <div className="flex flex-col h-full">
+      <ConversationDrawer
+        open={drawerOpen}
+        conversations={conversations}
+        activeId={conversationId}
+        onSelect={openConversation}
+        onDelete={deleteConversation}
+        onClose={() => setDrawerOpen(false)}
+      />
+
+      {/* Conversation bar */}
+      <div className="shrink-0 flex items-center gap-2 pb-2 border-b border-line">
+        <button
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Conversation history"
+          className="text-mut hover:text-fg text-xl leading-none px-1"
+        >
+          ☰
+        </button>
+        <span className="flex-1 text-center text-sm font-medium text-mut truncate">
+          {title || 'New conversation'}
+        </span>
+        <button
+          onClick={startNewConversation}
+          aria-label="New conversation"
+          className="text-mut hover:text-fg text-2xl leading-none px-1"
+        >
+          +
+        </button>
+      </div>
+
       {/* Message list */}
-      <div className="flex-1 overflow-y-auto space-y-3 pb-4">
+      <div className="flex-1 overflow-y-auto space-y-3 py-4">
         {!historyLoaded && messages.length === 0 && (
           <div className="flex justify-start">
             <div className="max-w-[85%] rounded-2xl px-4 py-3 bg-panel border border-line">
