@@ -18,6 +18,7 @@
 - **Theme tokens** (Tailwind v4, from `app/globals.css`): `bg-bg`, `bg-panel`, `border-line`, `text-fg`, `text-mut`, `bg-ember`/`text-ember-ink`, `bg-moss`/`text-moss-ink`, `text-warn`.
 - **Next 16 dynamic route params are async:** `{ params }: { params: Promise<{ id: string }> }`, then `const { id } = await params`.
 - Run tests with `pnpm test` (vitest, includes `lib/**/*.test.ts`). Build with `pnpm build`. Lint with `pnpm lint`.
+- **Reporting during execution (orchestrator):** between tasks, report a short summary of what each subagent actually did — files touched and what changed, plus test/build status — in a few lines or bullets. Do **not** reproduce the code that was written or paste task code blocks back into chat; the plan already holds the code, and echoing it overflows the chat box. Keep each per-task report to a short paragraph or a handful of bullets.
 
 ## File structure
 
