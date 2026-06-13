@@ -53,6 +53,12 @@ export async function POST(req: Request) {
   const horizonStr = localDate(30)
   const scheduleEnd = goalData.deadline < horizonStr ? goalData.deadline : horizonStr
 
+  // Inverted window (e.g. a deadline before the season even starts): nothing to
+  // schedule now. Save the goal; the adjustment loop fills it in once the season opens.
+  if (scheduleEnd < startDate) {
+    return NextResponse.json({ goal, taskCount: 0 })
+  }
+
   const userPrompt = `Goal: ${goalData.title}
 Description: ${goalData.description ?? ''}
 Schedule through: ${scheduleEnd}
