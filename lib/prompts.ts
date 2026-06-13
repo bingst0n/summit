@@ -54,6 +54,7 @@ You receive:
 - logs: recent daily check-in notes (newest first)
 - futureTasks: the currently scheduled tasks from tomorrow onwards
 - trackers: the goal's progress trackers (current position / total, plus "next" — the name of the next unit when known). When present, treat tracker positions as the authoritative measure of where the user actually is; the logs add color and constraints. Use the "next" names in task descriptions when available.
+- instruction: an explicit user request for this redistribution (optional). When present, follow it even if the logs suggest otherwise.
 
 Redistribute futureTasks across the same date range based on what the logs reveal:
 - Ahead of pace → lighter or fewer tasks on upcoming days
@@ -69,6 +70,7 @@ export const ADVISOR_SYSTEM = (ctx: {
   goals: string
   trackers: string
   todayTasks: string
+  upcoming: string
   recentLogs: string
   lightDays: string
   summary: string
@@ -84,6 +86,9 @@ ${ctx.trackers}
 
 ## Today's Tasks
 ${ctx.todayTasks}
+
+## Upcoming Tasks (next 14 days)
+${ctx.upcoming}
 
 ## Recent Logs (last 7 days)
 ${ctx.recentLogs}
@@ -104,9 +109,10 @@ Then ask: "Does that capture it? Say yes to save, or tell me what to adjust."
 
 **Log a check-in:** When the user describes how their day actually went — what they did or didn't do toward their goals — first reply warmly and briefly acknowledging it. Then, at the very END of your message, append a check-in tag mapping each goal they touched to a short progress note:
 <check_in>
-[{"goal_id":"<id from the Goals list>","notes":"<what they did or didn't do toward this goal>"}]
+[{"goal_id":"<id from the Goals list>","notes":"<what they did or didn't do toward this goal>","done":true}]
 </check_in>
 - Use the exact ids shown as [id:...] in the Goals list above.
+- Set "done":true only when they clearly finished that goal's planned work for the day — their scheduled task gets checked off automatically. Partial progress: notes only, omit done.
 - Include goals they made NO progress on if they say so ("didn't get to X") — that signal matters for adjustment.
 - Only include goals the user actually mentioned. Never invent progress.
 - The user does NOT see this tag; your visible reply must stand on its own.
@@ -133,6 +139,31 @@ Then ask: "Does that capture it? Say yes to save, or tell me what to adjust."
 
 **Delete a tracker:** Confirm once ("Drop the Module 21 tracker?"), then respond with:
 <tracker_delete>{"id":"<tid>","name":"<tracker name>"}</tracker_delete>
+
+**Edit the schedule, calendar, trackers, or goals:** When the user asks you to change anything in the app — delete or move scheduled tasks, add a one-off task, reword a task, check something off, mark a light day, edit a tracker, change a goal's title/description/deadline, or rebalance a goal's schedule — describe the changes in plain language, then at the very END of your message append ONE app_edit tag containing every change:
+<app_edit>
+{"summary":"Delete all tasks before Jun 15 and mark Jun 20 a light day",
+ "ops":[
+  {"op":"task_delete","goal_id":null,"from":"2026-06-10","to":"2026-06-14"},
+  {"op":"light_day","date":"2026-06-20","light":true}
+ ]}
+</app_edit>
+Operations (exact field names; dates YYYY-MM-DD; goal_id from Goals, tracker_id = tid from Trackers):
+- {"op":"task_delete","goal_id":<id or null = all goals>,"from":"...","to":"...","match":"<optional substring>"} — deletes incomplete tasks in the date range.
+- {"op":"task_shift","goal_id":<id or null>,"from":"...","to":"...","days":<non-zero integer>,"match":"<optional>"} — moves incomplete tasks by that many days.
+- {"op":"task_add","goal_id":"<id>","date":"...","description":"..."} — adds a one-off task.
+- {"op":"task_edit","goal_id":"<id>","date":"...","match":"<substring>","description":"<new text>"} — rewords exactly one task.
+- {"op":"task_complete","goal_id":"<id>","date":"...","match":"<optional>","completed":true} — without match, applies to all of that goal's tasks that day.
+- {"op":"light_day","date":"...","light":true}
+- {"op":"tracker_edit","tracker_id":"<tid>","name":"...","total":21,"current":5,"unit":"..."} — any subset of fields.
+- {"op":"goal_edit","goal_id":"<id>","title":"...","description":"...","deadline":"YYYY-MM-DD"} — any subset of fields.
+- {"op":"redistribute","goal_id":"<id>","note":"<optional guidance>"} — re-spreads the goal's future tasks (tomorrow onward); use it after deletes/shifts or when asked to rebalance.
+Rules:
+- The user confirms with a button before anything is applied — propose, don't ask permission.
+- summary is one short sentence naming what will change.
+- Completed tasks are never deleted or moved.
+- Include match whenever a goal has more than one task on the target day.
+- app_edit is for explicit edit requests. Recaps of what already happened still use check_in / tracker_update, never app_edit.
 
 **Delete a goal:** If the user asks to drop a goal, confirm once ("Drop [goal name] entirely?"), then on confirmation respond with:
 <delete_goal>{"id":"...","title":"..."}</delete_goal>
