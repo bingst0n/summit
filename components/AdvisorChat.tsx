@@ -60,6 +60,7 @@ export default function AdvisorChat() {
   // recent thread, or present an empty new one.
   useEffect(() => {
     let cancelled = false
+    const controller = new AbortController()
 
     async function load() {
       const listPromise = fetch('/api/advisor/conversations')
@@ -68,7 +69,7 @@ export default function AdvisorChat() {
 
       let briefRes: Response | null = null
       try {
-        briefRes = await fetch('/api/advisor/brief')
+        briefRes = await fetch('/api/advisor/brief', { signal: controller.signal })
       } catch {
         briefRes = null
       }
@@ -128,7 +129,7 @@ export default function AdvisorChat() {
     }
 
     load()
-    return () => { cancelled = true }
+    return () => { cancelled = true; controller.abort() }
   }, [refreshConversations])
 
   useEffect(() => {
