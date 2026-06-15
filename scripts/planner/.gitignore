@@ -1,0 +1,2 @@
+# DB snapshots written by apply.mjs --write (contain schedule data, not meant for git)
+snapshot-*.json
