@@ -52,13 +52,11 @@ const perGoal = {}
 for (const t of tasks) perGoal[gName(t.goal_id)] = (perGoal[gName(t.goal_id)] || 0) + 1
 console.log('Per-goal totals:', perGoal)
 
-const math = tasks.filter((t) => gName(t.goal_id).includes('Math')).map((t) => t.description)
-const covered = new Set(math.join(' ').match(/M2[123] part \d+/g) || [])
-const missing = []
-for (let p = 5; p <= 22; p++) if (!covered.has(`M21 part ${p}`)) missing.push(`M21 part ${p}`)
-for (let p = 1; p <= 15; p++) if (!covered.has(`M22 part ${p}`)) missing.push(`M22 part ${p}`)
-for (let p = 1; p <= 8; p++) if (!covered.has(`M23 part ${p}`)) missing.push(`M23 part ${p}`)
-console.log(`Math parts M21p5–M23p8 missing: ${missing.length}${missing.length ? ' -> ' + missing.join(', ') : ' ✓ (all 41 covered)'}`)
+// tasks are generic goal labels now — confirm each goal uses one/two clean labels, no specifics
+const labelsByGoal = {}
+for (const t of tasks) (labelsByGoal[gName(t.goal_id)] ??= new Set()).add(t.description)
+console.log('Task labels per goal (expect generic labels only, no specifics/times):')
+for (const g of Object.keys(labelsByGoal)) console.log(`  ${g}: ${[...labelsByGoal[g]].map((s) => JSON.stringify(s)).join(', ')}`)
 
 // Confirm the browser's anon key can read tasks (RLS disabled) — this is the path the calendar UI uses
 const ANON = env.NEXT_PUBLIC_SUPABASE_ANON_KEY

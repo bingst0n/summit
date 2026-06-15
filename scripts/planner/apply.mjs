@@ -9,10 +9,11 @@
 //   node scripts/planner/apply.mjs --write         # snapshot, wipe incomplete tasks in range, insert new
 //
 // Plan rules:
-//   - Fixed weekly rhythm, 2 deep-work goals/day; 3–4 hrs/day target.
-//   - Daily habits: reading every day, gym 5x/wk, music 15 min daily from 6/27.
+//   - Fixed weekly rhythm, 2 deep-work goals/day; ~3–4 hrs/day target.
+//   - Daily habits: reading every day, gym 5x/wk, music daily from 6/27.
+//   - Tasks are GENERIC goal labels only — no specific activities, no time/amounts. Trackers hold targets.
 //   - Cleared days (genuine downtime): keep reading + gym, drop deep work + music.
-//   - All 6 goals due 2026-08-31; work spread across the full window, tracker-grounded.
+//   - All 6 goals due 2026-08-31; work spread across the full window.
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -59,89 +60,12 @@ const TPL = {
 }
 const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const phaseOf = (date) => (date <= '2026-06-30' ? 'foundations' : date <= '2026-07-31' ? 'build' : 'test-ready')
-
-// ---- content generators (progressive, tracker-grounded) ----
-// Math: M21 is at 4/22 per tracker, so resume at part 5. Then M22 (15), M23 (8).
-const MATH_UNITS = []
-for (let p = 5; p <= 22; p++) MATH_UNITS.push(`M21 part ${p}`)
-for (let p = 1; p <= 15; p++) MATH_UNITS.push(`M22 part ${p}`)
-for (let p = 1; p <= 8; p++) MATH_UNITS.push(`M23 part ${p}`)
-const MATH_REVIEW = [
-  'Mixed review: redo the problems you flagged across M21–M23.',
-  'Consolidation: re-derive M22’s key results from scratch, no notes.',
-  'Timed set spanning M21–M23 — push for speed without losing accuracy.',
-  'Deep-dive your weakest module section; rework 6–8 problems.',
-]
-function mathDesc(n) {
-  const i = n * 2
-  if (i < MATH_UNITS.length) {
-    const span = MATH_UNITS[i + 1] ? `${MATH_UNITS[i]} and ${MATH_UNITS[i + 1]}` : MATH_UNITS[i]
-    return `Work through ${span}, in order. Flag any sticking points for review.`
-  }
-  return MATH_REVIEW[n % MATH_REVIEW.length]
-}
-
-const SAT_CYCLE = [
-  'Reading: one literature + one paired-passage set (~25 Qs); review every miss.',
-  'Writing & Language: grammar + rhetoric set (~25 Qs); log recurring error types.',
-  'Math (no-calc): algebra & problem-solving set (~20 Qs).',
-  'Math (calc): advanced math & data set (~20 Qs).',
-  'Reading: inference & tone-focused passages (~25 Qs).',
-  'Full timed practice test — simulate real conditions; score all sections.',
-  'Error review: categorize last test’s misses, drill your top-2 error types.',
-]
-const satDesc = (n, ph) =>
-  SAT_CYCLE[n % SAT_CYCLE.length] +
-  (ph === 'foundations' ? ' Method over speed.' : ph === 'build' ? ' Time each section.' : ' Strict test-day timing.')
-
-const AMC_CYCLE = [
-  'Algebra: 8 problems (factoring, inequalities, functions).',
-  'Geometry: 8 problems (triangles, circles, coordinate geometry).',
-  'Number theory: 8 problems (divisibility, modular arithmetic).',
-  'Counting & probability: 8 problems.',
-  'Mixed mid-range: AMC 10 problems 1–15, ~10 problems.',
-  'Back-half: AMC 10 problems 16–25, 6–8 problems, multiple approaches each.',
-  'Full AMC 10 mock (25 Q / 75 min); score and categorize errors.',
-  'Error review + re-attempt the back-half problems you missed.',
-]
-function amcDesc(n, ph) {
-  if (ph === 'test-ready' && n % 4 === 0) return 'AIME-intro problems (levels 1–8): solve 3, get comfortable with the integer-answer format.'
-  return AMC_CYCLE[n % AMC_CYCLE.length]
-}
-
-const ZH_CYCLE = [
-  'Speech: draft/refine one section; tighten word choice and transitions.',
-  'Speaking: record a 2–3 min delivery, then review for fluency and tone.',
-  'Idioms & vocab: 15–20 chengyu with short usage examples.',
-  'Cultural knowledge: study a theme (history / geography / philosophy); make flashcards.',
-  'Mock Q&A: answer 8–10 competition-style questions aloud, unscripted.',
-]
-function zhDesc(n, ph) {
-  if (ph === 'test-ready' && n % 5 === 4) return 'Full mock: deliver your speech and field follow-up questions under realistic conditions.'
-  return ZH_CYCLE[n % ZH_CYCLE.length]
-}
-
-const MUSIC_CYCLE = [
-  'SightReadingFactory 15 min + drill two major scales in position.',
-  'Leavitt Guitar Method: next exercises; focus on rhythm and tempo.',
-  'Theory (Zenchi): scale construction; build M7/m7 chords from each degree.',
-  'Modes & fretboard: compute modes from one parent scale; map across the neck.',
-]
-const musicDesc = (n) => MUSIC_CYCLE[n % MUSIC_CYCLE.length]
-
-const GYM_CYCLE = [
-  'Upper-body strength (~45 min).',
-  'Lower-body strength (~45 min).',
-  'Cardio / conditioning (~30–40 min).',
-  'Full-body strength (~45 min).',
-  'Core & mobility (~30 min).',
-]
-const gymDesc = (n) => GYM_CYCLE[n % GYM_CYCLE.length]
-const READING = 'Read 25 pages.'
-
-const genDeep = (key, n, ph) =>
-  key === 'MATH' ? mathDesc(n) : key === 'SAT' ? satDesc(n, ph) : key === 'AMC' ? amcDesc(n, ph) : zhDesc(n, ph)
+// ---- task labels: generic goal name only (no specific activities, no time/amounts) ----
+const LABEL = { MATH: 'Math modules', SAT: 'SAT prep', AMC: 'AMC prep', CHINESE: 'Chinese prep' }
+const genDeep = (key) => LABEL[key]
+const musicDesc = () => 'Music practice'
+const gymDesc = () => 'Gym'
+const READING = 'Reading'
 
 // ---- build the schedule ----
 const goals = await (await fetch(`${URL}/rest/v1/goals?select=id,title`, { headers: H })).json()
@@ -160,22 +84,20 @@ for (let d = new Date(START + 'T00:00:00Z'); d <= new Date(END + 'T00:00:00Z'); 
   dates.push(d.toISOString().slice(0, 10))
 }
 
-const counters = { MATH: 0, SAT: 0, AMC: 0, CHINESE: 0, MUSIC: 0, GYM: 0 }
 const rows = [] // {goal_id, date, description, completed:false} + _key for display
 for (const date of dates) {
   const wd = new Date(date + 'T00:00:00Z').getUTCDay()
   const tpl = TPL[wd]
-  const ph = phaseOf(date)
   const cleared = CLEARED.has(date)
   const push = (key, desc) => rows.push({ goal_id: GID[key], date, description: desc, completed: false, _key: key })
 
   if (!cleared) {
-    for (const key of tpl.deep) push(key, genDeep(key, counters[key]++, ph))
+    for (const key of tpl.deep) push(key, genDeep(key))
   }
-  // 15-min daily music habit, every day from 6/27 onward (off during the cleared stretch)
-  if (date >= '2026-06-27') push('MUSIC', musicDesc(counters.MUSIC++))
+  // daily music habit, every day from 6/27 onward (off during the cleared stretch)
+  if (date >= '2026-06-27') push('MUSIC', musicDesc())
   push('WELLNESS', READING)
-  if (tpl.gym) push('WELLNESS', gymDesc(counters.GYM++))
+  if (tpl.gym) push('WELLNESS', gymDesc())
 }
 
 // ---- output ----
