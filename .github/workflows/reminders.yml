@@ -1,14 +1,18 @@
 name: Pushcut focus reminders
 
+# Pushcut focus reminders are DISABLED — the automatic schedule below is
+# commented out so no tri-daily notifications fire. `workflow_dispatch` is kept
+# so the job can still be run manually (and the schedule re-enabled) later.
+#
 # Tri-daily reminders at 8 AM / 12 PM / 6 PM Eastern. GitHub cron is UTC and
 # ignores DST — these times assume EDT (UTC-4). When EST returns in November,
 # shift each hour by +1 (13/17/23) or the reminders fire an hour early.
 # Vercel Cron isn't used: the Hobby plan caps at 2 jobs, once per day each.
 on:
-  schedule:
-    - cron: '0 12 * * *' # 8:00 AM EDT — morning ascent
-    - cron: '0 16 * * *' # 12:00 PM EDT — midday check
-    - cron: '0 22 * * *' # 6:00 PM EDT — final push
+  # schedule:
+  #   - cron: '0 12 * * *' # 8:00 AM EDT — morning ascent
+  #   - cron: '0 16 * * *' # 12:00 PM EDT — midday check
+  #   - cron: '0 22 * * *' # 6:00 PM EDT — final push
   workflow_dispatch:
 
 jobs:
