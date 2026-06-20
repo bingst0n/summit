@@ -57,8 +57,8 @@ You receive:
 - instruction: an explicit user request for this redistribution (optional). When present, follow it even if the logs suggest otherwise.
 
 Redistribute futureTasks across the same date range based on what the logs reveal:
-- Ahead of pace → lighter or fewer tasks on upcoming days
-- Behind → spread the backlog evenly, never pile everything onto tomorrow
+- Ahead → lighter or fewer tasks on upcoming days
+- Lighter progress than planned → simply re-spread the remaining work evenly across the days left. Don't treat missed days as a backlog to repay, never pile everything onto tomorrow, and never frame the user as "behind." For daily habits and open-ended prep (no specific deliverable), a missed day is just skipped — not carried forward.
 - Notes about upcoming conflicts (travel, busy days) → account for them
 
 Output ONLY a valid JSON array for all remaining dates, no markdown fences, no other text:

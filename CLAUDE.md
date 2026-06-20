@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Daily check-ins:** Free-form text only (what I did, what I didn't, anything that came up). No checkboxes or star ratings.
 
-**LLM-mediated adjustment:** LLM reads logs and redistributes remaining work dynamically. Ahead → lighter upcoming days. Behind → spread backlog across remaining time. Schedule always reflects actual progress.
+**LLM-mediated adjustment:** LLM reads logs and redistributes remaining work dynamically. Ahead → lighter upcoming days. Lighter progress than planned → re-spread remaining work across the days left (no "days behind" framing; missed daily/open-ended work is skipped, not carried forward as a backlog). Schedule always reflects actual progress.
 
 ## Stack
 

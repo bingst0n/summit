@@ -49,13 +49,13 @@ export default async function HomePage() {
   const upNext = incomplete.slice(1)
   const cleared = todayTasks.filter(t => t.completed)
 
-  // Per-goal progress + schedule drift (incomplete tasks dated before today).
-  const stats: Record<string, { total: number; done: number; overdue: number }> = {}
+  // Per-goal progress. Missed/past-incomplete tasks aren't flagged — the
+  // schedule just reflects reality after the next re-plan.
+  const stats: Record<string, { total: number; done: number }> = {}
   for (const t of taskStats) {
-    const s = (stats[t.goal_id] ??= { total: 0, done: 0, overdue: 0 })
+    const s = (stats[t.goal_id] ??= { total: 0, done: 0 })
     s.total++
     if (t.completed) s.done++
-    else if (t.date < date) s.overdue++
   }
 
   const upcomingTasks: Record<string, DailyTask[]> = {}
@@ -166,9 +166,8 @@ export default async function HomePage() {
               <SectionHead>GOALS</SectionHead>
               <div className="flex gap-2.5 overflow-x-auto pb-1 md:flex-col md:overflow-visible [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {goals.map(g => {
-                  const s = stats[g.id] ?? { total: 0, done: 0, overdue: 0 }
+                  const s = stats[g.id] ?? { total: 0, done: 0 }
                   const pctDone = s.total > 0 ? Math.round((s.done / s.total) * 100) : 0
-                  const behind = s.overdue > 0
                   return (
                     <Link
                       key={g.id}
@@ -181,7 +180,7 @@ export default async function HomePage() {
                       </div>
                       <div className="h-[5px] rounded-full bg-[#243652] overflow-hidden">
                         <span
-                          className={`block h-full rounded-full ${behind ? 'bg-gradient-to-r from-ember to-ember2' : 'bg-moss'}`}
+                          className="block h-full rounded-full bg-moss"
                           style={{ width: `${pctDone}%` }}
                         />
                       </div>
@@ -189,14 +188,7 @@ export default async function HomePage() {
                         {s.total === 0 ? (
                           <span className="text-ice">NO SCHEDULE YET</span>
                         ) : (
-                          <>
-                            {s.done}/{s.total} ·{' '}
-                            {behind ? (
-                              <span className="text-warn">{s.overdue} DAY{s.overdue === 1 ? '' : 'S'} BEHIND</span>
-                            ) : (
-                              <span className="text-moss">ON PACE</span>
-                            )}
-                          </>
+                          <span>{s.done}/{s.total} DONE</span>
                         )}
                       </p>
                     </Link>
